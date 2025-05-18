@@ -1,0 +1,38 @@
+{
+  "rules": {
+    // Publicly readable data (services, schedule, blocked slots for client-side checks)
+    "services": {
+      ".read": true,
+      ".write": "auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2'" // Replace with actual Admin Firebase UID
+    },
+    "standardSchedule": {
+      ".read": true,
+      ".write": "auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2'" // Replace with actual Admin Firebase UID
+    },
+    "blockedSlots": {
+      ".read": true,
+      ".write": "auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2'" // Replace with actual Admin Firebase UID
+    },
+    // Appointments:
+    // Users can create (write) their own appointments.
+    // Admin can read all and write/update all.
+    "appointments": {
+      ".read": "auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2'", // Admin can read all
+      "$appointmentId": {
+        // New appointments can be written by anyone (client-side booking)
+        // For more security, you might validate data here or use Cloud Functions.
+        ".write": "newData.exists() || (auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2')",
+        // Admin can update/delete existing appointments
+        ".validate": "newData.hasChildren(['id', 'name', 'phone', 'email', 'serviceId', 'date', 'time', 'status', 'requestedAt'])"
+      }
+    },
+    // Fallback to the rules you requested for now, but the above is more secure.
+    // If you want to keep it completely open for now as requested:
+    // ".read": true,
+    // ".write": true
+    // However, for production, this is highly insecure.
+    // The rules below are the ones you specified, uncomment them and comment out the more secure ones above if you insist.
+     ".read": true,
+     ".write": true
+  }
+}

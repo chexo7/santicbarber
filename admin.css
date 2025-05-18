@@ -1,0 +1,507 @@
+/* --- Reset Básico y Variables CSS --- */
+:root {
+    --primary-color: #e0ac69; /* Dorado/Bronce */
+    --dark-bg: #121212;
+    --medium-bg: #1a1a1a;
+    --light-bg: #2a2a2a;
+    --text-color: #f4f4f4;
+    --text-muted: #ccc;
+    --error-alt-color: #fca311; /* Orange/Amber for errors */
+    --success-alt-color: #2a9d8f; /* Teal for success buttons */
+    --disabled-bg: #333;
+    --disabled-border: #444;
+    --disabled-text: #666;
+    --font-primary: 'Poppins', sans-serif;
+    --font-secondary: 'Playfair Display', serif; /* Added if needed for consistency */
+}
+
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+    font-size: 16px; /* Base for REM */
+}
+
+
+/* --- Estilos Generales Admin --- */
+body {
+    background-color: var(--dark-bg);
+    color: var(--text-color);
+    font-family: var(--font-primary);
+    line-height: 1.6;
+    padding: 2rem;
+}
+.container {
+    max-width: 1000px;
+    margin: 0 auto;
+    background-color: var(--medium-bg);
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+h1, h2 {
+    color: var(--primary-color);
+    margin-bottom: 1.5rem;
+}
+h1 { font-size: 1.8rem; text-align: center; }
+h2 { font-size: 1.4rem; border-bottom: 1px solid #444; padding-bottom: 0.5rem; margin-top: 2rem;}
+
+.admin-section { display: none; }
+.admin-section.active { display: block; }
+
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-muted); font-size: 0.9rem;}
+.form-group input[type="text"],
+.form-group input[type="password"],
+.form-group input[type="date"],
+.form-group input[type="number"],
+.form-group input[type="time"] { /* Added time */
+    width: 100%;
+    padding: 10px;
+    background-color: var(--light-bg);
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: var(--text-color);
+    font-size: 1rem;
+}
+.form-group input:focus,
+.form-group input[type="time"]:focus { /* Added time */
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(224, 172, 105, 0.3);
+}
+.error-message {
+    color: var(--error-alt-color); /* Use alternative error color */
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+}
+.error-message::before { content: '⚠️ '; } /* Add icon to login error */
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap; /* Wrap on small screens */
+    gap: 1rem;
+}
+
+.admin-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap; /* Allow tabs to wrap */
+    border-bottom: 1px solid #444;
+}
+.tab-button {
+    padding: 10px 18px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text-muted);
+    font-size: 1rem;
+    font-weight: 600;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+.tab-button:hover { color: var(--text-color); }
+.tab-button.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+.placeholder {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* General Admin Button Styling */
+.admin-button {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: background-color 0.2s ease, transform 0.1s ease, opacity 0.2s ease;
+    line-height: 1.4; /* Ensure consistent height */
+}
+.admin-button.success { background-color: var(--success-alt-color); color: white; }
+.admin-button.danger { background-color: #e76f51; color: white; }
+.admin-button.primary { background-color: var(--primary-color); color: var(--dark-bg); }
+.admin-button.warning { background-color: var(--error-alt-color); color: white; } /* Added Warning */
+
+.admin-button:hover:not(:disabled) {
+    opacity: 0.85;
+    transform: translateY(-1px);
+}
+.admin-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Feedback Messages */
+.feedback-message {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    min-height: 1.3em;
+    padding: 0.5rem 0;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    transition: color 0.3s ease;
+}
+.feedback-message::before { font-size: 1.1em; }
+.feedback-message.success { color: var(--primary-color); } /* Changed to primary for success */
+.feedback-message.success::before { content: '✅'; }
+.feedback-message.error { color: var(--error-alt-color); }
+.feedback-message.error::before { content: '⚠️'; }
+
+/* --- Pestaña Citas (Appointments) --- */
+#appointments-list {
+     max-height: 60vh;
+     overflow-y: auto;
+     padding-right: 10px; /* Space for scrollbar */
+     border: 1px solid #444;
+     border-radius: 4px;
+     margin-top: 1rem;
+}
+#appointments-list .placeholder { padding: 2rem; text-align: center; color: var(--text-muted); }
+
+.appointment-item {
+    background-color: var(--light-bg); /* Slightly lighter than main medium */
+    border: 1px solid #444;
+    border-radius: 5px;
+    margin-bottom: 1rem;
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.appointment-details { flex-grow: 1; }
+.appointment-details p { margin-bottom: 0.4rem; font-size: 0.9rem; line-height: 1.5; }
+.appointment-details p strong { color: var(--text-color); min-width: 80px; display: inline-block; font-weight: 500; }
+.appointment-status { font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; text-transform: uppercase; display: inline-flex; align-items: center; gap: 0.3em; }
+/* Colorblind Friendly Statuses */
+.status-pending { background-color: #4a4a4a; color: var(--text-muted); }
+.status-pending::before { content: '🕒'; }
+.status-confirmed { background-color: var(--primary-color); color: var(--dark-bg); }
+.status-confirmed::before { content: '✓'; }
+.status-rejected,
+.status-cancelled { background-color: #555; color: #fff; }
+.status-rejected::before,
+.status-cancelled::before { content: '✕'; }
+.appointment-actions { display: flex; gap: 0.5rem; flex-shrink: 0; align-items: center; }
+
+
+/* --- Pestaña Horario Estándar --- */
+#weekly-schedule-inputs {
+    display: grid;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+.daily-schedule-group {
+    background-color: var(--light-bg); /* Use light-bg for contrast */
+    padding: 1rem 1.5rem;
+    border-radius: 6px;
+    border: 1px solid #555;
+}
+.daily-schedule-group legend {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--primary-color);
+    margin-bottom: 0.8rem;
+    padding: 0 0.5rem;
+}
+.day-controls {
+    display: flex;
+    flex-direction: column; /* Stack toggle and time ranges vertically */
+    align-items: flex-start; /* Align children to the left */
+    gap: 1rem;
+}
+.day-open-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 500; /* Make it slightly bolder */
+}
+.day-open-toggle input[type="checkbox"] {
+    width: 1.1em; height: 1.1em;
+    accent-color: var(--primary-color);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.time-range-inputs {
+    display: flex;
+    flex-direction: column; /* Stack Morning/Afternoon groups */
+    gap: 1rem; /* Space between Morning and Afternoon */
+    width: 100%; /* Take full width */
+    padding-left: 1.5rem; /* Indent time ranges under the main toggle */
+    border-left: 2px solid #444; /* Visual indent line */
+    transition: opacity 0.3s ease; /* Smooth fade when disabling */
+}
+.time-input-group { /* Represents Morning OR Afternoon block */
+    display: flex;
+    align-items: center;
+    gap: 1rem; /* Space between period toggle and time inputs */
+    flex-wrap: wrap; /* Allow wrapping on small screens */
+}
+.period-toggle-label { /* Label for Morning/Afternoon checkbox */
+     display: flex;
+     align-items: center;
+     gap: 0.4rem;
+     cursor: pointer;
+     font-weight: 500;
+     min-width: 90px; /* Ensure consistent alignment */
+     user-select: none;
+}
+.period-toggle-label input[type="checkbox"] {
+     width: 1em; height: 1em;
+     accent-color: var(--primary-color);
+     cursor: pointer;
+     flex-shrink: 0;
+}
+.time-input-group-controls { /* Container for the time inputs */
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      flex-wrap: wrap; /* Allow time inputs to wrap if needed */
+      transition: opacity 0.3s ease; /* Smooth fade when disabling */
+ }
+.time-input-group-controls input[type="time"] {
+    width: 100px; /* Fixed width for time */
+    padding: 6px 8px;
+    font-size: 0.9rem;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background-color: var(--dark-bg); /* Darker input background */
+    color: var(--text-color);
+    color-scheme: dark; /* Hint for browser styling */
+    cursor: pointer;
+}
+/* Time picker indicator styling */
+.time-input-group-controls input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7) brightness(1) sepia(1) hue-rotate(330deg) saturate(3); /* Match primary color hue */
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+.time-input-group-controls input[type="time"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
+
+/* --- Disabling inputs based on checkboxes using :has() --- */
+/* Requires browser support for :has() */
+
+/* Disable ALL time ranges if the main 'Abierto' is unchecked */
+.daily-schedule-group:has(.day-open-toggle input:not(:checked)) .time-range-inputs {
+     opacity: 0.4;
+     pointer-events: none;
+}
+
+/* Disable specific Morning/Afternoon time inputs if their period toggle is unchecked */
+.time-input-group:has(.period-toggle-label input:not(:checked)) .time-input-group-controls {
+      opacity: 0.5; /* Keep slightly visible but disabled */
+      pointer-events: none;
+ }
+
+/* --- Pestaña Excepciones/Bloqueos (Availability) --- */
+.availability-date-selector { margin-bottom: 1.5rem; max-width: 300px; }
+#availability-date { cursor: pointer; }
+#availability-time-slots {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.75rem;
+    margin-top: 1rem;
+    border-top: 1px solid #444;
+    padding-top: 1.5rem;
+}
+.availability-slot {
+    padding: 10px;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease, border-style 0.2s ease, transform 0.1s ease, color 0.2s ease, opacity 0.2s ease;
+    text-align: center;
+    font-size: 0.9rem;
+    border: 2px solid transparent;
+}
+/* AVAILABLE State: Primary color */
+.availability-slot.available {
+    background-color: var(--primary-color);
+    color: var(--dark-bg);
+    border-color: var(--primary-color);
+    border-style: solid;
+}
+.availability-slot.available:hover { background-color: #c89452; border-color: #c89452; }
+
+/* BLOCKED State (Manually by admin or by standard schedule): Dashed border */
+.availability-slot.blocked {
+    background-color: var(--medium-bg);
+    color: var(--text-muted);
+    border-color: #777;
+    border-style: dashed; /* Dashed indicates controllable block */
+}
+.availability-slot.blocked:hover:not(:disabled) {
+    background-color: var(--light-bg);
+    border-color: #999;
+    color: var(--text-color);
+}
+
+/* BLOCKED & DISABLED State (Due to booking): Solid, darker, line-through */
+.availability-slot.blocked:disabled {
+    background-color: #3a3a3a; /* Distinct dark grey */
+    border-color: #555;
+    border-style: solid; /* Solid indicates uncontrollable block (booking) */
+    color: #888;
+    opacity: 0.7;
+    cursor: not-allowed;
+    text-decoration: line-through;
+    transform: none;
+}
+.availability-slot:hover:not(:disabled) { transform: translateY(-1px); }
+
+
+/* --- Pestaña Gestionar Servicios --- */
+.admin-actions-bar {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #444;
+}
+
+#services-list-admin {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.service-admin-item {
+    background-color: var(--light-bg);
+    border: 1px solid #444;
+    border-radius: 5px;
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center; /* Align items vertically */
+    gap: 1rem;
+    flex-wrap: wrap;
+    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease;
+}
+.service-admin-item.inactive {
+    background-color: #2e2e2e; /* Slightly different background for inactive */
+    border-color: #3a3a3a;
+    opacity: 0.8;
+}
+.service-admin-item.editing {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 5px rgba(224, 172, 105, 0.3);
+    align-items: flex-start; /* Align top when editing */
+}
+
+/* Display Mode Styles */
+.service-details-display {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem; /* Row and column gap */
+}
+.service-name {
+    font-weight: 600;
+    color: var(--text-color);
+    font-size: 1.05em;
+}
+.service-info {
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+.service-status {
+    font-weight: bold;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    margin-left: auto; /* Push status to the right within display */
+}
+.status-active { background-color: var(--success-alt-color); color: white; }
+.status-inactive { background-color: #555; color: #ddd; }
+
+.service-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    align-items: center;
+}
+
+/* Edit Mode Styles */
+.service-details-edit {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    width: 100%; /* Take full width in edit mode */
+    margin-bottom: 1rem; /* Space before save/cancel */
+}
+.service-details-edit .form-group {
+    margin-bottom: 0; /* Reset margin within the edit form */
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+}
+.service-details-edit .form-group.inline { flex-wrap: nowrap; } /* Prevent inline groups wrapping */
+.service-details-edit label {
+    flex-basis: 120px; /* Fixed label width */
+    text-align: right;
+    margin-bottom: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+.service-details-edit input[type="text"] { flex-grow: 1; min-width: 150px; }
+.service-details-edit input[type="number"] { width: 90px; text-align: right; }
+.service-details-edit .form-group.checkbox label { flex-basis: auto; text-align: left; order: 2; } /* Label after checkbox */
+.service-details-edit .form-group.checkbox input[type="checkbox"] { order: 1; width: 1em; height: 1em; accent-color: var(--primary-color); cursor: pointer; }
+
+.service-actions.edit-mode {
+     width: 100%; /* Full width actions */
+     justify-content: flex-end; /* Align buttons right */
+     padding-top: 0.5rem;
+     margin-top: 0.5rem; /* Added margin top */
+     border-top: 1px dashed #444;
+}
+
+/* --- Responsive adjustments --- */
+@media (max-width: 768px) {
+    .service-admin-item { flex-direction: column; align-items: stretch; }
+    .service-details-display { flex-direction: column; align-items: flex-start; gap: 0.3rem; margin-bottom: 0.8rem; }
+    .service-status { margin-left: 0; margin-top: 0.3rem; }
+    .service-actions { justify-content: flex-start; } /* Align buttons left */
+    .service-details-edit label { text-align: left; flex-basis: 100%; margin-bottom: 0.3rem; }
+    .service-details-edit input { width: 100% !important; /* Force full width on mobile */ }
+    .service-details-edit .form-group.checkbox { flex-wrap: nowrap; align-items: center; }
+}
+
+@media (max-width: 600px) {
+    .day-controls {
+        padding-left: 0; /* Remove indent on smaller screens */
+        border-left: none;
+    }
+     .time-range-inputs {
+         padding-left: 0.5rem; /* Smaller indent */
+     }
+}

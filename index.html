@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Santic Barber - Agenda tu Cita</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <style>
+        .input-hint {
+            display: block;
+            font-size: 0.85em;
+            color: var(--error-alt-color, #fca311);
+            margin-top: 0.3rem;
+            min-height: 1.2em;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+        .input-hint.visible {
+            visibility: visible;
+            opacity: 1;
+        }
+        .form-group input.invalid,
+        .form-group select.invalid,
+        .form-group textarea.invalid {
+             border-color: var(--error-alt-color, #fca311);
+             box-shadow: 0 0 0 2px rgba(252, 163, 17, 0.2);
+        }
+        .service-price-display {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-left: 0.5em;
+            font-size: 0.9em;
+        }
+        #confirmation-message {
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+         #confirmation-message::before {
+            flex-shrink: 0;
+            margin-right: 0.7em;
+        }
+         #confirmation-text {
+             flex-grow: 1;
+             text-align: left;
+         }
+        .close-button {
+            background: none; border: none; color: inherit;
+            font-size: 1.5rem; font-weight: bold; line-height: 1;
+            padding: 0.2em 0.5em; margin-left: 1em; cursor: pointer;
+            opacity: 0.7; transition: opacity 0.2s ease;
+            align-self: flex-start;
+            display: none;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            opacity: 1; outline: none;
+        }
+        .loading-placeholder {
+            color: var(--text-muted);
+            font-style: italic;
+            padding: 1rem 0;
+            display: block;
+            text-align: center;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="background-animation-container"></div>
+
+    <header id="main-header">
+        <div class="container">
+            <div class="logo">Santic Barber</div>
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="#hero">Inicio</a></li>
+                    <li><a href="#services">Servicios</a></li>
+                    <li><a href="#booking">Agendar Cita</a></li>
+                </ul>
+            </nav>
+            <button id="mobile-menu-toggle" aria-label="Toggle Menu" aria-expanded="false">☰</button>
+        </div>
+    </header>
+
+    <main>
+        <section id="hero">
+            <div class="hero-overlay"></div>
+            <div class="container hero-content">
+                <h1><span>Santic Barber</span><br>Tu Estilo, Nuestra Pasión</h1>
+                <p>Experimenta la barbería de precisión en un ambiente moderno y relajado.</p>
+                <a href="#booking" class="cta-button">Agendar Cita Ahora</a>
+            </div>
+        </section>
+
+
+        <section id="services">
+             <div class="container">
+                 <h2>Nuestros Servicios Estrella</h2>
+                 <div class="services-grid">
+                     <p class="loading-placeholder">Cargando servicios...</p>
+                 </div>
+            </div>
+        </section>
+
+
+        <section id="booking">
+            <div class="container">
+                <h2>Agenda tu Cita Online</h2>
+                <p class="section-subtitle">Rápido, fácil y sin llamadas.</p>
+                <form id="booking-form" novalidate>
+                    <div class="form-group">
+                        <label for="name">Nombre Completo:</label>
+                        <input type="text" id="name" name="name" required placeholder="Tu nombre y apellido" aria-describedby="name-hint">
+                        <span id="name-hint" class="input-hint" aria-live="polite"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Teléfono:</label>
+                        <input type="tel" id="phone" name="phone" required
+                               pattern="^\+569\d{8}$"
+                               title="Formato: +569 seguido de 8 dígitos (ej: +56912345678)"
+                               placeholder="+56912345678"
+                               aria-describedby="phone-hint">
+                        <span id="phone-hint" class="input-hint" aria-live="polite"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Correo Electrónico:</label>
+                        <input type="email" id="email" name="email" required placeholder="tucorreo@ejemplo.com" aria-describedby="email-hint">
+                        <span id="email-hint" class="input-hint" aria-live="polite"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="service">Selecciona el Servicio: <span id="selected-service-price" class="service-price-display"></span></label>
+                        <select id="service" name="service" required aria-describedby="service-hint">
+                            <option value="" disabled selected>-- Elige un servicio --</option>
+                        </select>
+                        <span id="service-hint" class="input-hint" aria-live="polite"></span>
+
+                        <div id="other-service-details-group" class="form-group" style="display: none; margin-top: 1rem;">
+                            <label for="other-service-details">Por favor, especifica el servicio deseado:</label>
+                            <textarea id="other-service-details" name="other_service_details" rows="3" placeholder="Describe brevemente qué necesitas..." aria-describedby="other-service-hint"></textarea>
+                            <span id="other-service-hint" class="input-hint" aria-live="polite"></span>
+                        </div>
+                    </div>
+
+                    <div id="custom-date-time-selector">
+                        <div class="form-group">
+                            <label id="day-selector-label">Selecciona un Día:</label>
+                            <div id="day-selector" role="group" aria-labelledby="day-selector-label">
+                                <button type="button" id="prev-day" class="nav-button" aria-label="Semana anterior" disabled><</button>
+                                <div id="day-options-wrapper">
+                                    <div id="day-options">
+                                        <span class="loading-placeholder">Cargando días...</span>
+                                    </div>
+                                </div>
+                                <button type="button" id="next-day" class="nav-button" aria-label="Semana siguiente">></button>
+                            </div>
+                            <span id="date-hint" class="input-hint" aria-live="polite"></span>
+                        </div>
+
+                        <div id="time-slots-container" style="display: none;" aria-live="polite">
+                             <div class="form-group">
+                                <label id="time-selector-label">Selecciona una Hora:</label>
+                                <div id="time-options" role="group" aria-labelledby="time-selector-label">
+                                     <span class="loading-placeholder">Selecciona un día para ver horarios.</span>
+                                </div>
+                                <span id="time-hint" class="input-hint" aria-live="polite"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="selected-date" name="selected_date" value="">
+                    <input type="hidden" id="selected-time" name="selected_time" value="">
+
+                    <div class="form-group terms-agreement">
+                        <input type="checkbox" id="terms" name="terms" required aria-describedby="terms-hint">
+                        <label for="terms">
+                            He leído y acepto los <a href="terminos.html" target="_blank" rel="noopener noreferrer" title="Leer Términos y Condiciones">Términos y Condiciones</a> y la <a href="privacidad.html" target="_blank" rel="noopener noreferrer" title="Leer Política de Privacidad">Política de Privacidad</a>.
+                        </label>
+                        <span id="terms-hint" class="input-hint" aria-live="polite"></span>
+                    </div>
+
+                    <div id="confirmation-message" role="alert" style="display: none;">
+                        <span id="confirmation-text"></span>
+                        <button id="close-confirmation-button" class="close-button" type="button" aria-label="Cerrar mensaje">×</button>
+                    </div>
+
+                    <button type="submit" class="cta-button form-submit-button" disabled>Confirmar Cita</button>
+                </form>
+            </div>
+        </section>
+
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-info">
+                    <p><strong>Santic Barber</strong></p>
+                    <p>RUT: 77.XXX.XXX-X</p>
+                    <p>Dirección: Calle Ficticia 123, Comuna, Santiago</p>
+                    <p>Teléfono: +56 9 XXXX XXXX</p>
+                </div>
+                <div class="footer-legal">
+                    <p>© <span id="current-year"></span> Santic Barber. Todos los derechos reservados.</p>
+                    <nav class="legal-nav">
+                        <a href="terminos.html" target="_blank" rel="noopener noreferrer" title="Leer Términos y Condiciones">Términos y Condiciones</a> |
+                        <a href="privacidad.html" target="_blank" rel="noopener noreferrer" title="Leer Política de Privacidad">Política de Privacidad</a>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script type="module">
+      // Import the functions you need from the SDKs you need
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+      import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+      // Only import database for the public page, auth is not needed here
+      import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+      // Your web app's Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyBHaT9gQRq1e58VjX798LnkxqLtjF9W9DA", // KEEP YOUR KEY SECRET
+        authDomain: "santicbarber.firebaseapp.com",
+        databaseURL: "https://santicbarber-default-rtdb.firebaseio.com",
+        projectId: "santicbarber",
+        storageBucket: "santicbarber.firebasestorage.app",
+        messagingSenderId: "52314683922",
+        appId: "1:52314683922:web:b61e2332935a731ed6b6cb",
+        measurementId: "G-W9ZEM88PZ7"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const analytics = getAnalytics(app);
+      const database = getDatabase(app);
+
+      // Make Firebase services available globally for script.js
+      window.firebaseServices = {
+          database,
+          ref,
+          set, // For saving appointments
+          get,
+          child
+      };
+    </script>
+
+    <script src="script.js"></script>
+</body>
+</html>
