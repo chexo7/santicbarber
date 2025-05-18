@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { value: '❓', text: '❓ Interrogación' },
     ];
     const SLOT_INTERVAL_MINUTES = 30;
-    const baseTimeSlots = [
+    const baseTimeSlots = [ // Horarios base que el administrador puede gestionar
         '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30',
         '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
         '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00'
@@ -98,12 +98,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- Funciones de Utilidad (Generales - sin cambios mayores) ---
+    // --- Funciones de Utilidad (Generales) ---
     function formatDateDMY(dateStringYMD) { if (!dateStringYMD || !/^\d{4}-\d{2}-\d{2}$/.test(dateStringYMD)) return dateStringYMD; try { const [year, month, day] = dateStringYMD.split('-'); return `${day}/${month}/${year}`; } catch (e) { console.warn("Could not format date:", dateStringYMD, e); return dateStringYMD; } }
     function showFeedback(element, message, type = 'success', duration = 3500) { if (!element) return; element.textContent = message; element.className = `feedback-message ${type}`; element.style.display = (type === 'clear' || !message) ? 'none' : 'inline-flex'; if (duration > 0 && type !== 'clear') { setTimeout(() => { if (element.textContent === message) { element.textContent = ''; element.className = 'feedback-message'; element.style.display = 'none'; } }, duration); } else if (type === 'clear') { element.textContent = ''; element.className = 'feedback-message'; element.style.display = 'none'; } }
     function timeToMinutes(timeStr) { if (!timeStr || !/^\d{1,2}:\d{2}$/.test(timeStr)) return null; try { const [hours, minutes] = timeStr.split(':').map(Number); if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null; return hours * 60 + minutes; } catch (e) { console.warn("Could not convert time to minutes:", timeStr, e); return null; } }
     function minutesToTime(totalMinutes) { if (totalMinutes === null || totalMinutes < 0 || isNaN(totalMinutes)) return null; const h = Math.floor(totalMinutes / 60) % 24; const m = totalMinutes % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`; }
-    function generateUniqueId(prefix = 'item_') { return prefix + Date.now().toString(36) + Math.random().toString(36).substring(2, 9); } // Firebase can generate its own push keys, but this can be used for object keys if needed.
+    function generateUniqueId(prefix = 'item_') { return prefix + Date.now().toString(36) + Math.random().toString(36).substring(2, 9); }
     function formatPriceAdmin(value) { const number = Number(value); if (isNaN(number) || value === null || value === undefined || number < 0) return '0'; return number.toString(); }
     function formatPriceDisplay(value) { const number = Number(value); if (isNaN(number) || number <= 0) return 'Gratis'; return `$${number.toLocaleString('es-CL')}`; }
     function formatDuration(minutes) { if (isNaN(minutes) || minutes <= 0) return 'N/A'; return `${minutes} min`; }
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Lógica de Autenticación con Firebase ---
     function handleLogin(event) {
         event.preventDefault();
-        const emailInput = document.getElementById('email'); // Changed from username
+        const emailInput = document.getElementById('email');
         const passwordInput = document.getElementById('password');
         if (!emailInput || !passwordInput) return;
 
@@ -121,17 +121,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         signInWithEmailAndPassword(auth, email, password)
             .then((userCredential) => {
-                // Signed in
                 const user = userCredential.user;
                 console.log("Admin logged in:", user.uid);
-                // showAdminPanel() will be called by onAuthStateChanged
                 if (loginError) loginError.style.display = 'none';
                 if (loginForm) loginForm.reset();
+                // showAdminPanel() es llamado por onAuthStateChanged
             })
             .catch((error) => {
-                const errorCode = error.code;
-                const errorMessage = error.message;
-                console.error("Login failed:", errorCode, errorMessage);
+                console.error("Login failed:", error.code, error.message);
                 if (loginError) {
                     loginError.textContent = "Correo o contraseña incorrectos. Intenta de nuevo.";
                     loginError.style.display = 'block';
@@ -142,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleLogout() {
         signOut(auth).then(() => {
             console.log("Admin logged out");
-            // showLoginSection() will be called by onAuthStateChanged
+            // showLoginSection() es llamado por onAuthStateChanged
         }).catch((error) => {
             console.error("Logout failed:", error);
             showFeedback(appointmentsFeedback, `Error al cerrar sesión: ${error.message}`, 'error');
@@ -151,11 +148,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     onAuthStateChanged(auth, (user) => {
         if (user) {
-            // User is signed in
             console.log("Auth state changed: User signed in", user.uid);
             showAdminPanel();
         } else {
-            // User is signed out
             console.log("Auth state changed: User signed out");
             showLoginSection();
         }
@@ -171,34 +166,56 @@ document.addEventListener('DOMContentLoaded', () => {
     function showLoginSection() {
         if (adminPanel) adminPanel.classList.remove('active');
         if (loginSection) loginSection.classList.add('active');
-        // Clear dynamic content
+        // Limpiar contenido dinámico para evitar mostrar datos antiguos brevemente al re-loguear
         if (appointmentsListContainer) appointmentsListContainer.innerHTML = '';
-        if (appointmentsFeedback) showFeedback(appointmentsFeedback, '', 'clear');
         if (weeklyScheduleContainer) weeklyScheduleContainer.innerHTML = '';
-        if (scheduleSaveFeedback) showFeedback(scheduleSaveFeedback, '', 'clear');
         if (availabilityTimeSlotsContainer) availabilityTimeSlotsContainer.innerHTML = '<p class="placeholder">Selecciona una fecha para ver y modificar los horarios.</p>';
         if (servicesAdminListContainer) servicesAdminListContainer.innerHTML = '';
-        if (servicesAdminFeedback) showFeedback(servicesAdminFeedback, '', 'clear');
         if (availabilityDateInput) availabilityDateInput.value = '';
+        [appointmentsFeedback, scheduleSaveFeedback, servicesAdminFeedback].forEach(el => showFeedback(el, '', 'clear'));
     }
-
-    // No need for checkLoginStatus() anymore, onAuthStateChanged handles it.
 
     // --- Carga Inicial de Datos del Panel ---
     async function loadInitialData() {
+        // Limpiar mensajes de feedback al cargar cualquier pestaña o al iniciar.
         [appointmentsFeedback, scheduleSaveFeedback, servicesAdminFeedback].forEach(el => showFeedback(el, '', 'clear'));
-        if (appointmentsListContainer) await loadAppointments();
-        if (weeklyScheduleContainer) await loadStandardScheduleUI();
-        if (servicesAdminListContainer) await loadServicesAdminUI();
-        if (availabilityDateInput) await setupAvailabilityCalendar(); // Made async
 
+        // Cargar datos para la pestaña activa o la primera por defecto
         const activeTabButton = document.querySelector('.tab-button.active');
+        let initialTabId = 'appointments'; // Default tab
         if (activeTabButton) {
-            const targetTabId = activeTabButton.dataset.tab;
-            const targetContent = document.getElementById(`${targetTabId}-tab`);
-            tabContents.forEach(content => content.classList.remove('active'));
-            if (targetContent) targetContent.classList.add('active');
-        } else if (tabButtons.length > 0) { handleTabClick({ currentTarget: tabButtons[0] }); }
+            initialTabId = activeTabButton.dataset.tab;
+        } else if (tabButtons.length > 0) {
+            initialTabId = tabButtons[0].dataset.tab;
+            tabButtons[0].classList.add('active'); // Activa la primera si ninguna lo está
+        }
+
+        tabContents.forEach(content => content.classList.remove('active'));
+        const targetContent = document.getElementById(`${initialTabId}-tab`);
+        if (targetContent) targetContent.classList.add('active');
+
+
+        // Cargar datos comunes o necesarios para todas las pestañas si los hubiera
+        // Cargar datos específicos de la pestaña inicial
+        switch (initialTabId) {
+            case 'appointments':
+                if (appointmentsListContainer) await loadAppointments();
+                break;
+            case 'standard-schedule':
+                if (weeklyScheduleContainer) await loadStandardScheduleUI();
+                break;
+            case 'availability':
+                if (availabilityDateInput) await setupAvailabilityCalendar();
+                break;
+            case 'services':
+                if (servicesAdminListContainer) await loadServicesAdminUI();
+                break;
+        }
+        // Cargar el resto en segundo plano o bajo demanda para mejorar la percepción de velocidad inicial
+        if (initialTabId !== 'appointments' && appointmentsListContainer) await loadAppointments();
+        if (initialTabId !== 'standard-schedule' && weeklyScheduleContainer) await loadStandardScheduleUI();
+        if (initialTabId !== 'availability' && availabilityDateInput) await setupAvailabilityCalendar();
+        if (initialTabId !== 'services' && servicesAdminListContainer) await loadServicesAdminUI();
     }
 
 
@@ -206,13 +223,24 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleTabClick(event) {
         if (!event || !event.currentTarget || !event.currentTarget.dataset.tab) return;
         const clickedTab = event.currentTarget; const targetTabId = clickedTab.dataset.tab;
-        if (clickedTab.classList.contains('active')) return;
+        if (clickedTab.classList.contains('active')) return; // Ya está activa
+
         tabContents.forEach(content => content.classList.remove('active'));
         tabButtons.forEach(button => button.classList.remove('active'));
+
         const targetContent = document.getElementById(`${targetTabId}-tab`);
         if (targetContent) targetContent.classList.add('active');
         clickedTab.classList.add('active');
+
+        // Limpiar mensajes de feedback al cambiar de pestaña
         [appointmentsFeedback, scheduleSaveFeedback, servicesAdminFeedback].forEach(el => showFeedback(el, '', 'clear'));
+
+        // Opcional: Cargar datos específicos de la pestaña si no se cargaron inicialmente
+        // (ya se cargan todos en loadInitialData, pero podría ser más selectivo aquí)
+        // switch (targetTabId) {
+        //     case 'appointments': if (!appointmentsListContainer.hasChildNodes() || appointmentsListContainer.querySelector('.placeholder')) await loadAppointments(); break;
+        //     // ... y así para otras pestañas si fuera necesario
+        // }
     }
 
     // --- Lógica de Citas (Appointments) ---
@@ -222,10 +250,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const appointmentsData = await loadDataFirebase(APPOINTMENTS_PATH, {});
         const allServicesData = await loadDataFirebase(SERVICES_PATH, {});
 
-        // Convert Firebase objects to arrays
         const appointments = appointmentsData ? Object.values(appointmentsData) : [];
         const allServices = allServicesData ? Object.values(allServicesData) : [];
-
 
         appointmentsListContainer.innerHTML = '';
         if (appointments.length === 0) { appointmentsListContainer.innerHTML = '<p class="placeholder">No hay citas registradas.</p>'; return; }
@@ -276,9 +302,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const appt = snapshot.val();
                 if (appt.status !== newStatus) {
                     await updateDataFirebase(appointmentPath, { status: newStatus });
-                    const action = newStatus === 'confirmed' ? 'confirmada' : 'rechazada';
+                    const action = newStatus === 'confirmed' ? 'confirmada' : (newStatus === 'rejected' ? 'rechazada' : newStatus);
                     showFeedback(appointmentsFeedback, `Cita de ${appt.name || '?'} ${action}.`, newStatus === 'confirmed' ? 'success' : 'error', 5000);
-                    await loadAppointments(); // Reload list
+                    await loadAppointments(); // Recargar lista de citas
+                    // Si la pestaña de disponibilidad está activa y es la fecha afectada, recargarla
                     const affectedDate = appt.date;
                     const availTabActive = document.getElementById('availability-tab')?.classList.contains('active');
                     if (availTabActive && availabilityDateInput?.value === affectedDate) {
@@ -290,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error("Error updating appointment status:", error);
-            showFeedback(appointmentsFeedback, `Error: ${error.message}`, 'error', 5000);
+            showFeedback(appointmentsFeedback, `Error actualizando estado: ${error.message}`, 'error', 5000);
         }
     }
 
@@ -303,12 +330,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             const appt = snapshot.val();
-            const confirmText = `¿Seguro ELIMINAR cita de ${appt.name || '?'} (${formatDateDMY(appt.date)} ${appt.time || 'N/A'})?\n\n¡NO SE PUEDE DESHACER!`;
+            const confirmText = `¿Seguro ELIMINAR cita de ${appt.name || '?'} (${formatDateDMY(appt.date)} ${appt.time || 'N/A'})?\n\n¡Esta acción NO SE PUEDE DESHACER!`;
 
             if (window.confirm(confirmText)) {
                 await removeDataFirebase(appointmentPath);
-                showFeedback(appointmentsFeedback, `Cita de ${appt.name || '?'} eliminada.`, 'success', 5000);
-                await loadAppointments();
+                showFeedback(appointmentsFeedback, `Cita de ${appt.name || '?'} eliminada permanentemente.`, 'success', 5000);
+                await loadAppointments(); // Recargar lista de citas
+                // Si la pestaña de disponibilidad está activa y es la fecha afectada, recargarla
                 const affectedDate = appt.date;
                 const availTabActive = document.getElementById('availability-tab')?.classList.contains('active');
                 if (availTabActive && availabilityDateInput?.value === affectedDate) {
@@ -319,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error("Error deleting appointment:", error);
-            showFeedback(appointmentsFeedback, `Error al eliminar: ${error.message}`, 'error', 5000);
+            showFeedback(appointmentsFeedback, `Error al eliminar cita: ${error.message}`, 'error', 5000);
         }
     }
 
@@ -327,15 +355,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Lógica Horario Estándar ---
     async function loadStandardScheduleUI() {
         if (!weeklyScheduleContainer) return;
-        weeklyScheduleContainer.innerHTML = '<p class="placeholder">Cargando horario...</p>';
+        weeklyScheduleContainer.innerHTML = '<p class="placeholder">Cargando configuración del horario estándar...</p>';
         const schedule = await loadDataFirebase(STANDARD_SCHEDULE_PATH, {});
 
-        weeklyScheduleContainer.innerHTML = ''; // Clear placeholder
+        weeklyScheduleContainer.innerHTML = ''; // Limpiar placeholder
         daysOfWeekSpanish.forEach((dayName, i) => {
-            const dayIndexStr = String(i); // Firebase keys are strings
-            const def = { open: i !== 0, morningOpen: i !== 0, morningStart: '09:00', morningEnd: '14:00', afternoonOpen: i !== 0, afternoonStart: '15:00', afternoonEnd: '18:00' };
-            const saved = schedule[dayIndexStr] || {}; // Use string index
-            const day = {
+            const dayIndexStr = String(i); // Firebase keys son strings
+            // Valores por defecto: Domingo cerrado, resto abierto mañana y tarde.
+            const def = {
+                open: i !== 0, // Domingo (0) cerrado por defecto
+                morningOpen: i !== 0,
+                morningStart: '09:00',
+                morningEnd: '14:00',
+                afternoonOpen: i !== 0,
+                afternoonStart: '15:00',
+                afternoonEnd: '18:00'
+            };
+            const saved = schedule[dayIndexStr] || {};
+            // Aplicar valores guardados sobre los por defecto.
+            // Si saved.open es undefined, usa def.open. Si saved.morningOpen es undefined, usa (saved.open si existe, sino def.morningOpen)
+            const daySettings = {
                 open: saved.open !== undefined ? saved.open : def.open,
                 morningOpen: saved.morningOpen !== undefined ? saved.morningOpen : (saved.open !== undefined ? saved.open : def.morningOpen),
                 morningStart: saved.morningStart || def.morningStart,
@@ -344,115 +383,326 @@ document.addEventListener('DOMContentLoaded', () => {
                 afternoonStart: saved.afternoonStart || def.afternoonStart,
                 afternoonEnd: saved.afternoonEnd || def.afternoonEnd
             };
-            const fs = document.createElement('fieldset'); fs.classList.add('daily-schedule-group');
-            const oId = `o${i}`, mOId = `mo${i}`, mSId = `ms${i}`, mEId = `me${i}`, aOId = `ao${i}`, aSId = `as${i}`, aEId = `ae${i}`;
-            fs.innerHTML = `<legend>${dayName}</legend><div class="day-controls"><label class="day-open-toggle" for="${oId}"><input type="checkbox" id="${oId}" name="o_${i}" ${day.open ? 'checked' : ''}> Abierto</label><div class="time-range-inputs"><div class="time-input-group"><label class="period-toggle-label" for="${mOId}"><input type="checkbox" id="${mOId}" name="mO_${i}" ${day.morningOpen ? 'checked' : ''}> Mañana</label><div class="time-input-group-controls"><input type="time" id="${mSId}" name="mS_${i}" value="${day.morningStart || ''}" step="1800"><span>-</span><input type="time" id="${mEId}" name="mE_${i}" value="${day.morningEnd || ''}" step="1800"></div></div><div class="time-input-group"><label class="period-toggle-label" for="${aOId}"><input type="checkbox" id="${aOId}" name="aO_${i}" ${day.afternoonOpen ? 'checked' : ''}> Tarde</label><div class="time-input-group-controls"><input type="time" id="${aSId}" name="aS_${i}" value="${day.afternoonStart || ''}" step="1800"><span>-</span><input type="time" id="${aEId}" name="aE_${i}" value="${day.afternoonEnd || ''}" step="1800"></div></div></div></div>`;
-            weeklyScheduleContainer.appendChild(fs);
+
+            const fieldsetElement = document.createElement('fieldset');
+            fieldsetElement.classList.add('daily-schedule-group');
+            const openId = `day-open-${i}`, morningOpenId = `morning-open-${i}`, morningStartId = `morning-start-${i}`, morningEndId = `morning-end-${i}`,
+                  afternoonOpenId = `afternoon-open-${i}`, afternoonStartId = `afternoon-start-${i}`, afternoonEndId = `afternoon-end-${i}`;
+
+            fieldsetElement.innerHTML = `
+                <legend>${dayName}</legend>
+                <div class="day-controls">
+                    <label class="day-open-toggle" for="${openId}">
+                        <input type="checkbox" id="${openId}" name="day_open_${i}" ${daySettings.open ? 'checked' : ''}> Abierto todo el día
+                    </label>
+                    <div class="time-range-inputs">
+                        <div class="time-input-group">
+                            <label class="period-toggle-label" for="${morningOpenId}">
+                                <input type="checkbox" id="${morningOpenId}" name="morning_open_${i}" ${daySettings.morningOpen ? 'checked' : ''}> Mañana
+                            </label>
+                            <div class="time-input-group-controls">
+                                <input type="time" id="${morningStartId}" name="morning_start_${i}" value="${daySettings.morningStart}" step="1800">
+                                <span>-</span>
+                                <input type="time" id="${morningEndId}" name="morning_end_${i}" value="${daySettings.morningEnd}" step="1800">
+                            </div>
+                        </div>
+                        <div class="time-input-group">
+                            <label class="period-toggle-label" for="${afternoonOpenId}">
+                                <input type="checkbox" id="${afternoonOpenId}" name="afternoon_open_${i}" ${daySettings.afternoonOpen ? 'checked' : ''}> Tarde
+                            </label>
+                            <div class="time-input-group-controls">
+                                <input type="time" id="${afternoonStartId}" name="afternoon_start_${i}" value="${daySettings.afternoonStart}" step="1800">
+                                <span>-</span>
+                                <input type="time" id="${afternoonEndId}" name="afternoon_end_${i}" value="${daySettings.afternoonEnd}" step="1800">
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            weeklyScheduleContainer.appendChild(fieldsetElement);
         });
     }
 
     async function handleSaveStandardSchedule(event) {
-        event.preventDefault(); if (!standardScheduleForm || !scheduleSaveFeedback) return;
-        const newSchedule = {}; let valid = true; let err = null; let errEl = null;
+        event.preventDefault();
+        if (!standardScheduleForm || !scheduleSaveFeedback) return;
+        showFeedback(scheduleSaveFeedback, 'Guardando...', 'success', 0); // Indicar proceso
+
+        const newSchedule = {};
+        let formIsValid = true;
+        let firstErrorElement = null;
+        let errorMessage = '';
+
         for (let i = 0; i < 7; i++) {
-            const dayN = daysOfWeekSpanish[i]; const o = standardScheduleForm.querySelector(`input[name="o_${i}"]`)?.checked ?? false; const mO = standardScheduleForm.querySelector(`input[name="mO_${i}"]`)?.checked ?? false; const aO = standardScheduleForm.querySelector(`input[name="aO_${i}"]`)?.checked ?? false; const mS = standardScheduleForm.querySelector(`input[name="mS_${i}"]`)?.value || null; const mE = standardScheduleForm.querySelector(`input[name="mE_${i}"]`)?.value || null; const aS = standardScheduleForm.querySelector(`input[name="aS_${i}"]`)?.value || null; const aE = standardScheduleForm.querySelector(`input[name="aE_${i}"]`)?.value || null;
-            newSchedule[i] = { open: o, morningOpen: o && mO, morningStart: mS, morningEnd: mE, afternoonOpen: o && aO, afternoonStart: aS, afternoonEnd: aE };
-            if (o) { const mSt = timeToMinutes(mS), mEt = timeToMinutes(mE), aSt = timeToMinutes(aS), aEt = timeToMinutes(aE); if (!mO && !aO) { err = `${dayN}: Habilite Mañana o Tarde.`; valid = false; errEl = standardScheduleForm.querySelector(`input[name="mO_${i}"]`); break; } if (mO) { if (!mS || !mE) { err = `${dayN} (M): Faltan horas.`; errEl = standardScheduleForm.querySelector(`input[name="mS_${i}"]`); valid = false; break; } if (mEt <= mSt) { err = `${dayN} (M): Fin <= Inicio.`; errEl = standardScheduleForm.querySelector(`input[name="mE_${i}"]`); valid = false; break; } } if (aO) { if (!aS || !aE) { err = `${dayN} (T): Faltan horas.`; errEl = standardScheduleForm.querySelector(`input[name="aS_${i}"]`); valid = false; break; } if (aEt <= aSt) { err = `${dayN} (T): Fin <= Inicio.`; errEl = standardScheduleForm.querySelector(`input[name="aE_${i}"]`); valid = false; break; } } if (mO && aO && mE && aS) { if (aSt < mEt) { err = `${dayN}: Inicio tarde < Fin mañana.`; errEl = standardScheduleForm.querySelector(`input[name="aS_${i}"]`); valid = false; break; } } }
-        }
-        if (valid) {
+            const dayNameStr = daysOfWeekSpanish[i];
+            const isOpen = standardScheduleForm.querySelector(`input[name="day_open_${i}"]`)?.checked ?? false;
+            const isMorningOpen = standardScheduleForm.querySelector(`input[name="morning_open_${i}"]`)?.checked ?? false;
+            const isAfternoonOpen = standardScheduleForm.querySelector(`input[name="afternoon_open_${i}"]`)?.checked ?? false;
+            const morningStartTime = standardScheduleForm.querySelector(`input[name="morning_start_${i}"]`)?.value || null;
+            const morningEndTime = standardScheduleForm.querySelector(`input[name="morning_end_${i}"]`)?.value || null;
+            const afternoonStartTime = standardScheduleForm.querySelector(`input[name="afternoon_start_${i}"]`)?.value || null;
+            const afternoonEndTime = standardScheduleForm.querySelector(`input[name="afternoon_end_${i}"]`)?.value || null;
+
+            newSchedule[i] = {
+                open: isOpen,
+                morningOpen: isOpen && isMorningOpen, // Solo puede estar abierto si el día está abierto
+                morningStart: morningStartTime,
+                morningEnd: morningEndTime,
+                afternoonOpen: isOpen && isAfternoonOpen, // Solo puede estar abierto si el día está abierto
+                afternoonStart: afternoonStartTime,
+                afternoonEnd: afternoonEndTime
+            };
+
+            if (isOpen) { // Validaciones solo si el día está marcado como abierto
+                if (!isMorningOpen && !isAfternoonOpen) {
+                    formIsValid = false; errorMessage = `${dayNameStr}: Debe habilitar al menos un período (Mañana o Tarde) si el día está abierto.`;
+                    firstErrorElement = standardScheduleForm.querySelector(`input[name="morning_open_${i}"]`); break;
+                }
+                if (isMorningOpen) {
+                    if (!morningStartTime || !morningEndTime) {
+                        formIsValid = false; errorMessage = `${dayNameStr} (Mañana): Debe definir hora de inicio y fin.`;
+                        firstErrorElement = standardScheduleForm.querySelector(`input[name="morning_start_${i}"]`); break;
+                    }
+                    if (timeToMinutes(morningEndTime) <= timeToMinutes(morningStartTime)) {
+                        formIsValid = false; errorMessage = `${dayNameStr} (Mañana): La hora de fin debe ser posterior a la de inicio.`;
+                        firstErrorElement = standardScheduleForm.querySelector(`input[name="morning_end_${i}"]`); break;
+                    }
+                }
+                if (isAfternoonOpen) {
+                    if (!afternoonStartTime || !afternoonEndTime) {
+                        formIsValid = false; errorMessage = `${dayNameStr} (Tarde): Debe definir hora de inicio y fin.`;
+                        firstErrorElement = standardScheduleForm.querySelector(`input[name="afternoon_start_${i}"]`); break;
+                    }
+                    if (timeToMinutes(afternoonEndTime) <= timeToMinutes(afternoonStartTime)) {
+                        formIsValid = false; errorMessage = `${dayNameStr} (Tarde): La hora de fin debe ser posterior a la de inicio.`;
+                        firstErrorElement = standardScheduleForm.querySelector(`input[name="afternoon_end_${i}"]`); break;
+                    }
+                }
+                if (isMorningOpen && isAfternoonOpen && morningEndTime && afternoonStartTime) {
+                    if (timeToMinutes(afternoonStartTime) < timeToMinutes(morningEndTime)) {
+                        formIsValid = false; errorMessage = `${dayNameStr}: El inicio del período de tarde no puede ser anterior al fin del período de mañana.`;
+                        firstErrorElement = standardScheduleForm.querySelector(`input[name="afternoon_start_${i}"]`); break;
+                    }
+                }
+            }
+        } // Fin del bucle for
+
+        if (formIsValid) {
             try {
                 await saveDataFirebase(STANDARD_SCHEDULE_PATH, newSchedule);
-                showFeedback(scheduleSaveFeedback, 'Horario guardado en Firebase.', 'success');
+                showFeedback(scheduleSaveFeedback, 'Horario estándar guardado exitosamente en Firebase.', 'success');
+                // **MEJORA**: Si la pestaña de excepciones está activa, recargar la disponibilidad
+                const availTabActive = document.getElementById('availability-tab')?.classList.contains('active');
+                const currentAvailDate = availabilityDateInput?.value;
+                if (availTabActive && currentAvailDate) {
+                    await loadAvailabilityForDate(currentAvailDate);
+                }
             } catch (error) {
-                showFeedback(scheduleSaveFeedback, `Error guardando horario: ${error.message}`, 'error', 6000);
+                showFeedback(scheduleSaveFeedback, `Error al guardar el horario: ${error.message}`, 'error', 6000);
             }
         } else {
-            showFeedback(scheduleSaveFeedback, err || 'Error horario.', 'error', 6000);
-            if (errEl) { errEl.focus(); errEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+            showFeedback(scheduleSaveFeedback, errorMessage || 'Hay errores en el formulario del horario.', 'error', 6000);
+            if (firstErrorElement) {
+                firstErrorElement.focus();
+                firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
         }
     }
 
     // --- Lógica de Excepciones/Disponibilidad (Admin View) ---
     async function setupAvailabilityCalendar() {
-        if (!availabilityDateInput) return; const today = new Date(); const todayStr = today.toISOString().split('T')[0];
-        availabilityDateInput.min = todayStr; const currentVal = availabilityDateInput.value;
-        if (currentVal && currentVal >= todayStr) { await loadAvailabilityForDate(currentVal); }
-        else { availabilityDateInput.value = todayStr; await loadAvailabilityForDate(todayStr); }
+        if (!availabilityDateInput) return;
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        availabilityDateInput.min = todayStr; // No se pueden seleccionar fechas pasadas
+
+        const currentVal = availabilityDateInput.value;
+        if (currentVal && currentVal >= todayStr) {
+            await loadAvailabilityForDate(currentVal);
+        } else {
+            availabilityDateInput.value = todayStr; // Seleccionar hoy por defecto
+            await loadAvailabilityForDate(todayStr);
+        }
 
         availabilityDateInput.addEventListener('change', async (e) => {
-            const selected = e.target.value;
-            if (selected && selected >= todayStr) { await loadAvailabilityForDate(selected); }
-            else { if (availabilityTimeSlotsContainer) { availabilityTimeSlotsContainer.innerHTML = '<p class="placeholder">Selecciona fecha válida (hoy o futura).</p>'; } }
+            const selectedDate = e.target.value;
+            if (selectedDate && selectedDate >= todayStr) {
+                await loadAvailabilityForDate(selectedDate);
+            } else if (selectedDate < todayStr) {
+                if (availabilityTimeSlotsContainer) { availabilityTimeSlotsContainer.innerHTML = '<p class="placeholder">No se pueden modificar fechas pasadas.</p>'; }
+                availabilityDateInput.value = todayStr; // Revertir a hoy si se selecciona una fecha pasada inválida
+                await loadAvailabilityForDate(todayStr);
+            } else {
+                 if (availabilityTimeSlotsContainer) { availabilityTimeSlotsContainer.innerHTML = '<p class="placeholder">Selecciona una fecha válida (hoy o futura).</p>'; }
+            }
         });
     }
 
     async function loadAvailabilityForDate(dateString) {
-        if (!availabilityTimeSlotsContainer) return; availabilityTimeSlotsContainer.innerHTML = '<p class="placeholder">Cargando...</p>';
-        if (!dateString || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) { availabilityTimeSlotsContainer.innerHTML = '<p class="placeholder">Fecha inválida.</p>'; return; }
+        if (!availabilityTimeSlotsContainer) return;
+        availabilityTimeSlotsContainer.innerHTML = '<p class="placeholder">Cargando disponibilidad para el ' + formatDateDMY(dateString) + '...</p>';
 
-        const date = new Date(`${dateString}T00:00:00`); const dayOfWeek = date.getDay();
-        const scheduleData = await loadDataFirebase(STANDARD_SCHEDULE_PATH, {});
-        const dayStd = scheduleData[dayOfWeek] || { open: false, morningOpen: false, afternoonOpen: false };
+        if (!dateString || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+            availabilityTimeSlotsContainer.innerHTML = '<p class="placeholder">Formato de fecha inválido.</p>';
+            return;
+        }
 
-        const exceptionsData = await loadDataFirebase(BLOCKED_SLOTS_PATH, {});
-        const explicitBlocks = (exceptionsData && exceptionsData[dateString]) ? exceptionsData[dateString] : []; // Firebase stores arrays directly
+        const selectedDateObj = new Date(`${dateString}T00:00:00`); // Asegurar que es a medianoche local
+        const dayOfWeek = selectedDateObj.getDay();
 
-        const apptsData = await loadDataFirebase(APPOINTMENTS_PATH, {});
-        const servicesData = await loadDataFirebase(SERVICES_PATH, {});
-        const appts = apptsData ? Object.values(apptsData) : [];
-        const services = servicesData ? Object.values(servicesData) : [];
+        // Cargar todos los datos necesarios en paralelo
+        const [scheduleData, exceptionsData, apptsData, servicesData] = await Promise.all([
+            loadDataFirebase(STANDARD_SCHEDULE_PATH, {}),
+            loadDataFirebase(BLOCKED_SLOTS_PATH, {}),
+            loadDataFirebase(APPOINTMENTS_PATH, {}),
+            loadDataFirebase(SERVICES_PATH, {})
+        ]);
 
-        const bookedDetails = appts.filter(a => a.date === dateString && (a.status === 'confirmed' || a.status === 'pending')).map(a => { const svc = services.find(s => s.id === a.serviceId); const dur = svc ? (svc.duration || 60) : 60; return { time: a.time, duration: dur }; }).filter(a => a.time);
+        const dayStandardSettings = scheduleData[dayOfWeek] || { open: false, morningOpen: false, afternoonOpen: false };
+        const explicitlyBlockedSlots = (exceptionsData && exceptionsData[dateString]) ? exceptionsData[dateString] : []; // Firebase guarda arrays directamente si existen
+        const allAppointmentsArray = apptsData ? Object.values(apptsData) : [];
+        const allServicesArray = servicesData ? Object.values(servicesData) : [];
 
-        availabilityTimeSlotsContainer.innerHTML = ''; // Clear loading
-        let hasSlots = false;
-        baseTimeSlots.forEach(time => {
-            hasSlots = true; const timeMin = timeToMinutes(time); if (timeMin === null) return;
-            let isStd = false; let isExplicit = explicitBlocks.includes(time); let isBooked = false; let bookReason = "";
-            for (const bk of bookedDetails) { const bkStart = timeToMinutes(bk.time); if (bkStart === null) continue; const bkEnd = bkStart + bk.duration; if (timeMin >= bkStart && timeMin < bkEnd) { isBooked = true; bookReason = (timeMin === bkStart) ? '(Cita-Ini)' : '(Cita-Cont)'; break; } }
-            if (dayStd.open) { const mSt = timeToMinutes(dayStd.morningStart), mEt = timeToMinutes(dayStd.morningEnd), aSt = timeToMinutes(dayStd.afternoonStart), aEt = timeToMinutes(dayStd.afternoonEnd); const fitM = (dayStd.morningOpen && mSt !== null && mEt !== null && timeMin >= mSt && timeMin < mEt); const fitA = (dayStd.afternoonOpen && aSt !== null && aEt !== null && timeMin >= aSt && timeMin < aEt); if (fitM || fitA) isStd = true; }
-            let statusCls = 'blocked'; let disabled = false; let title = `Hora ${time}`;
-            if (isBooked) { statusCls = 'blocked'; disabled = true; title += ` ${bookReason}`; }
-            else if (isExplicit) { statusCls = 'blocked'; disabled = false; title += ' (Bloq. Manual)'; }
-            else if (isStd) { statusCls = 'available'; disabled = false; title += ' (Disponible)'; }
-            else { statusCls = 'blocked'; disabled = false; title += ' (Cerrado Horario)'; }
-            const btn = document.createElement('button'); btn.type = 'button'; btn.classList.add('availability-slot', statusCls); btn.textContent = time; btn.dataset.time = time; btn.dataset.date = dateString; btn.disabled = disabled; btn.title = title; btn.setAttribute('aria-label', title); btn.setAttribute('aria-pressed', statusCls === 'blocked');
-            if (!disabled) { btn.addEventListener('click', toggleSlotException); } availabilityTimeSlotsContainer.appendChild(btn);
+        const appointmentsOnSelectedDate = allAppointmentsArray
+            .filter(appt => appt.date === dateString && (appt.status === 'confirmed' || appt.status === 'pending'))
+            .map(appt => {
+                const serviceDetails = allServicesArray.find(s => s.id === appt.serviceId);
+                const duration = serviceDetails ? (serviceDetails.duration || 60) : 60; // Default a 60 min si no se encuentra
+                return { time: appt.time, duration: duration };
+            })
+            .filter(appt => appt.time); // Asegurar que la cita tiene hora
+
+        availabilityTimeSlotsContainer.innerHTML = ''; // Limpiar placeholder/contenido anterior
+        let hasAnySlotsToShow = false;
+
+        baseTimeSlots.forEach(slotTime => {
+            hasAnySlotsToShow = true;
+            const slotTimeInMinutes = timeToMinutes(slotTime);
+            if (slotTimeInMinutes === null) return; // Skip si el formato de slotTime es inválido
+
+            let isBooked = false;
+            let bookingReason = "";
+            for (const bookedAppt of appointmentsOnSelectedDate) {
+                const bookedStartTimeInMinutes = timeToMinutes(bookedAppt.time);
+                if (bookedStartTimeInMinutes === null) continue;
+                const bookedEndTimeInMinutes = bookedStartTimeInMinutes + bookedAppt.duration;
+                // Un slot base está "ocupado" si su inicio cae dentro de una cita existente.
+                if (slotTimeInMinutes >= bookedStartTimeInMinutes && slotTimeInMinutes < bookedEndTimeInMinutes) {
+                    isBooked = true;
+                    bookingReason = (slotTimeInMinutes === bookedStartTimeInMinutes) ? '(Inicio Cita)' : '(Continuación Cita)';
+                    break;
+                }
+            }
+
+            const isExplicitlyBlocked = explicitlyBlockedSlots.includes(slotTime);
+
+            let isOpenByStandardSchedule = false;
+            if (dayStandardSettings.open) {
+                const morningStartTimeMin = timeToMinutes(dayStandardSettings.morningStart);
+                const morningEndTimeMin = timeToMinutes(dayStandardSettings.morningEnd);
+                const afternoonStartTimeMin = timeToMinutes(dayStandardSettings.afternoonStart);
+                const afternoonEndTimeMin = timeToMinutes(dayStandardSettings.afternoonEnd);
+
+                const isInMorningPeriod = (dayStandardSettings.morningOpen && morningStartTimeMin !== null && morningEndTimeMin !== null &&
+                                           slotTimeInMinutes >= morningStartTimeMin && slotTimeInMinutes < morningEndTimeMin);
+                const isInAfternoonPeriod = (dayStandardSettings.afternoonOpen && afternoonStartTimeMin !== null && afternoonEndTimeMin !== null &&
+                                             slotTimeInMinutes >= afternoonStartTimeMin && slotTimeInMinutes < afternoonEndTimeMin);
+                if (isInMorningPeriod || isInAfternoonPeriod) {
+                    isOpenByStandardSchedule = true;
+                }
+            }
+
+            let slotStatusClass = 'blocked'; // Por defecto, un slot está bloqueado (cerrado)
+            let isDisabledByBooking = false;
+            let slotTitle = `Horario ${slotTime}`;
+
+            if (isBooked) {
+                slotStatusClass = 'blocked'; // Mantener 'blocked' visualmente, pero deshabilitado
+                isDisabledByBooking = true;
+                slotTitle += ` ${bookingReason}`;
+            } else if (isExplicitlyBlocked) {
+                slotStatusClass = 'blocked'; // Bloqueado manualmente, no deshabilitado para permitir desbloqueo
+                slotTitle += ' (Bloqueado Manualmente)';
+            } else if (isOpenByStandardSchedule) {
+                slotStatusClass = 'available'; // Disponible según horario estándar
+                slotTitle += ' (Disponible por Horario)';
+            } else {
+                // Si no está reservado, ni bloqueado explícitamente, ni abierto por horario estándar,
+                // entonces está cerrado por horario estándar.
+                slotStatusClass = 'blocked';
+                slotTitle += ' (Cerrado por Horario Estándar)';
+            }
+
+            const slotButton = document.createElement('button');
+            slotButton.type = 'button';
+            slotButton.classList.add('availability-slot', slotStatusClass);
+            slotButton.textContent = slotTime;
+            slotButton.dataset.time = slotTime;
+            slotButton.dataset.date = dateString; // Guardar la fecha en el botón
+            slotButton.disabled = isDisabledByBooking; // Solo las citas deshabilitan el botón
+            slotButton.title = slotTitle;
+            slotButton.setAttribute('aria-label', slotTitle);
+            slotButton.setAttribute('aria-pressed', slotStatusClass === 'blocked' && !isDisabledByBooking); // Para accesibilidad
+
+            if (!isDisabledByBooking) { // Si no está deshabilitado por una reserva, se puede clickear
+                slotButton.addEventListener('click', toggleSlotException);
+            }
+            availabilityTimeSlotsContainer.appendChild(slotButton);
         });
-        if (!hasSlots) { availabilityTimeSlotsContainer.innerHTML = '<p class="placeholder">No hay horarios base.</p>'; }
+
+        if (!hasAnySlotsToShow) {
+            availabilityTimeSlotsContainer.innerHTML = '<p class="placeholder">No hay horarios base definidos para operar.</p>';
+        }
     }
 
+
     async function toggleSlotException(event) {
-        const btn = event.currentTarget; const date = btn.dataset.date; const time = btn.dataset.time; if (!date || !time) return;
+        const clickedButton = event.currentTarget;
+        const dateToModify = clickedButton.dataset.date;
+        const timeToToggle = clickedButton.dataset.time;
 
-        const exceptionsPath = `${BLOCKED_SLOTS_PATH}/${date}`;
+        if (!dateToModify || !timeToToggle) {
+            console.error("Error: Fecha u hora no definidas en el botón de slot.");
+            showFeedback(servicesAdminFeedback, "Error interno al procesar el slot.", 'error'); // Usar un feedback más genérico o específico de la pestaña
+            return;
+        }
+
+        const exceptionsPathForDate = `${BLOCKED_SLOTS_PATH}/${dateToModify}`;
         try {
-            const snapshot = await get(child(ref(database), exceptionsPath));
-            let currentDayExceptions = snapshot.exists() ? snapshot.val() : [];
-            if (!Array.isArray(currentDayExceptions)) currentDayExceptions = []; // Ensure it's an array
+            const snapshot = await get(child(ref(database), exceptionsPathForDate));
+            let currentDayExceptionsArray = snapshot.exists() ? snapshot.val() : [];
+            if (!Array.isArray(currentDayExceptionsArray)) { // Asegurar que es un array
+                currentDayExceptionsArray = [];
+            }
 
-            const isBlocked = currentDayExceptions.includes(time);
+            const isCurrentlyBlocked = currentDayExceptionsArray.includes(timeToToggle);
 
-            if (isBlocked) {
-                currentDayExceptions = currentDayExceptions.filter(t => t !== time);
-                console.log(`Excepción ELIMINADA: ${date} ${time}`);
-            } else {
-                if (!currentDayExceptions.includes(time)) {
-                    currentDayExceptions.push(time);
-                    currentDayExceptions.sort(); // Keep it sorted
+            if (isCurrentlyBlocked) { // Si está bloqueado, se desbloquea (elimina de la lista)
+                currentDayExceptionsArray = currentDayExceptionsArray.filter(t => t !== timeToToggle);
+                console.log(`Excepción ELIMINADA (slot desbloqueado): ${dateToModify} ${timeToToggle}`);
+            } else { // Si no está bloqueado (o sea, estaba 'available' o 'cerrado por horario'), se bloquea (añade a la lista)
+                if (!currentDayExceptionsArray.includes(timeToToggle)) {
+                    currentDayExceptionsArray.push(timeToToggle);
+                    currentDayExceptionsArray.sort(); // Mantener ordenado (opcional, pero bueno para consistencia)
                 }
-                console.log(`Excepción AÑADIDA: ${date} ${time}`);
+                console.log(`Excepción AÑADIDA (slot bloqueado): ${dateToModify} ${timeToToggle}`);
             }
 
-            if (currentDayExceptions.length === 0) {
-                await removeDataFirebase(exceptionsPath); // Remove the date node if no exceptions
+            // Guardar en Firebase
+            if (currentDayExceptionsArray.length === 0) {
+                // Si no quedan excepciones para este día, eliminar el nodo completo de la fecha para limpiar la BD
+                await removeDataFirebase(exceptionsPathForDate);
             } else {
-                await saveDataFirebase(exceptionsPath, currentDayExceptions);
+                await saveDataFirebase(exceptionsPathForDate, currentDayExceptionsArray);
             }
-            await loadAvailabilityForDate(date); // Reload UI
+
+            // Recargar la UI de disponibilidad para la fecha modificada
+            await loadAvailabilityForDate(dateToModify);
+            showFeedback(scheduleSaveFeedback, `Disponibilidad para ${timeToToggle} el ${formatDateDMY(dateToModify)} actualizada.`, 'success', 3000);
+
+
         } catch (error) {
-            console.error("Error toggling slot exception:", error);
-            showFeedback(servicesAdminFeedback, `Error al modificar bloqueo: ${error.message}`, 'error');
+            console.error("Error al modificar la excepción del slot:", error);
+            showFeedback(scheduleSaveFeedback, `Error al modificar bloqueo: ${error.message}`, 'error');
         }
     }
 
@@ -464,9 +714,9 @@ document.addEventListener('DOMContentLoaded', () => {
         showFeedback(servicesAdminFeedback, '', 'clear');
 
         const servicesData = await loadDataFirebase(SERVICES_PATH, {});
-        const services = servicesData ? Object.values(servicesData) : []; // Convert to array
+        const services = servicesData ? Object.values(servicesData) : [];
 
-        servicesAdminListContainer.innerHTML = ''; // Clear placeholder
+        servicesAdminListContainer.innerHTML = '';
         if (services.length === 0) { servicesAdminListContainer.innerHTML = '<p class="placeholder">No hay servicios definidos.</p>'; return; }
         services.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
@@ -492,10 +742,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleEditService(id) {
-        const el = servicesAdminListContainer.querySelector(`.service-admin-item[data-id="${id}"]`);
-        if (!el || el.classList.contains('editing')) return;
-        const editing = servicesAdminListContainer.querySelector('.editing'); if (editing) { showFeedback(servicesAdminFeedback, 'Termina edición actual.', 'error'); return; }
-        if (addNewServiceButton) addNewServiceButton.disabled = true;
+        const serviceItemElement = servicesAdminListContainer.querySelector(`.service-admin-item[data-id="${id}"]`);
+        if (!serviceItemElement || serviceItemElement.classList.contains('editing')) return;
+
+        const currentlyEditing = servicesAdminListContainer.querySelector('.service-admin-item.editing');
+        if (currentlyEditing) {
+            showFeedback(servicesAdminFeedback, 'Por favor, termina o cancela la edición actual antes de editar otro servicio.', 'error', 4000);
+            return;
+        }
+        if (addNewServiceButton) addNewServiceButton.disabled = true; // Deshabilitar "Añadir Nuevo" mientras se edita
 
         const servicePath = `${SERVICES_PATH}/${id}`;
         const snapshot = await get(child(ref(database), servicePath));
@@ -506,52 +761,71 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const service = snapshot.val();
 
-        const icons = suggestedIcons.map(i => `<option value="${i.value}" ${service.icon === i.value ? 'selected' : ''}>${i.text}</option>`).join('');
-        el.classList.add('editing');
-        el.innerHTML = `
+        const iconOptionsHTML = suggestedIcons.map(icon => `<option value="${icon.value}" ${service.icon === icon.value ? 'selected' : ''}>${icon.text}</option>`).join('');
+        serviceItemElement.classList.add('editing');
+        serviceItemElement.innerHTML = `
             <div class="service-details-edit">
                 <div class="form-group"> <label for="edit-name-${id}">Nombre:</label> <input type="text" id="edit-name-${id}" value="${service.name || ''}" required> </div>
-                <div class="form-group inline"> <label for="edit-icon-${id}">Icono:</label> <select id="edit-icon-${id}" class="service-icon-select">${icons}</select> </div>
+                <div class="form-group inline"> <label for="edit-icon-${id}">Icono:</label> <select id="edit-icon-${id}" class="service-icon-select">${iconOptionsHTML}</select> </div>
                 <div class="form-group inline"> <label for="edit-duration-${id}">Duración (min):</label> <input type="number" id="edit-duration-${id}" value="${formatPriceAdmin(service.duration)}" min="${SLOT_INTERVAL_MINUTES}" step="${SLOT_INTERVAL_MINUTES}" required> </div>
                 <div class="form-group inline"> <label for="edit-price-${id}">Precio ($):</label> <input type="number" id="edit-price-${id}" value="${formatPriceAdmin(service.price)}" min="0" step="500" required> </div>
-                <div class="form-group inline checkbox"> <input type="checkbox" id="edit-active-${id}" ${service.active ? 'checked' : ''}> <label for="edit-active-${id}">Activo</label> </div>
+                <div class="form-group inline checkbox"> <input type="checkbox" id="edit-active-${id}" ${service.active ? 'checked' : ''}> <label for="edit-active-${id}">Servicio Activo</label> </div>
             </div>
             <div class="service-actions edit-mode">
-                <button type="button" class="admin-button success save-edit-btn" data-id="${id}">Guardar</button>
-                <button type="button" class="admin-button cancel-edit-btn" data-id="${id}">Cancelar</button>
+                <button type="button" class="admin-button success save-edit-btn" data-id="${id}">Guardar Cambios</button>
+                <button type="button" class="admin-button cancel-edit-btn" data-id="${id}">Cancelar Edición</button>
             </div>`;
-        el.querySelector('.save-edit-btn').addEventListener('click', (e) => handleSaveService(e.currentTarget.dataset.id));
-        el.querySelector('.cancel-edit-btn').addEventListener('click', (e) => handleCancelEdit(e.currentTarget.dataset.id)); // No ID needed for cancel, just reload UI
-        el.querySelector(`#edit-name-${id}`).focus();
+        serviceItemElement.querySelector('.save-edit-btn').addEventListener('click', (e) => handleSaveService(e.currentTarget.dataset.id));
+        serviceItemElement.querySelector('.cancel-edit-btn').addEventListener('click', handleCancelEdit); // No necesita ID, solo recarga UI
+        const nameInputForFocus = serviceItemElement.querySelector(`#edit-name-${id}`);
+        if (nameInputForFocus) nameInputForFocus.focus();
     }
 
     async function handleSaveService(id) {
-        const el = servicesAdminListContainer.querySelector(`.service-admin-item[data-id="${id}"]`); if (!el) return;
-        const nameIn = el.querySelector(`#edit-name-${id}`); const iconSel = el.querySelector(`#edit-icon-${id}`); const durIn = el.querySelector(`#edit-duration-${id}`); const priceIn = el.querySelector(`#edit-price-${id}`); const activeIn = el.querySelector(`#edit-active-${id}`);
-        let ok = true; let errs = []; const name = nameIn.value.trim(); const icon = iconSel.value; const dur = parseInt(durIn.value, 10); const price = parseInt(priceIn.value, 10); const active = activeIn.checked;
-        if (!name) { ok = false; errs.push("Nombre vacío."); nameIn.style.borderColor = 'var(--error-alt-color)'; } else { nameIn.style.borderColor = ''; }
-        if (isNaN(dur) || dur <= 0 || dur % SLOT_INTERVAL_MINUTES !== 0) { ok = false; errs.push(`Duración múltiplo de ${SLOT_INTERVAL_MINUTES}.`); durIn.style.borderColor = 'var(--error-alt-color)'; } else { durIn.style.borderColor = ''; }
-        if (isNaN(price) || price < 0) { ok = false; errs.push("Precio inválido."); priceIn.style.borderColor = 'var(--error-alt-color)'; } else { priceIn.style.borderColor = ''; }
-        if (!ok) { showFeedback(servicesAdminFeedback, `Error: ${errs.join(' ')}`, 'error', 5000); return; }
+        const serviceItemElement = servicesAdminListContainer.querySelector(`.service-admin-item[data-id="${id}"]`);
+        if (!serviceItemElement) return;
+
+        const nameInput = serviceItemElement.querySelector(`#edit-name-${id}`);
+        const iconSelect = serviceItemElement.querySelector(`#edit-icon-${id}`);
+        const durationInput = serviceItemElement.querySelector(`#edit-duration-${id}`);
+        const priceInput = serviceItemElement.querySelector(`#edit-price-${id}`);
+        const activeCheckbox = serviceItemElement.querySelector(`#edit-active-${id}`);
+
+        let isValid = true; let errorMessages = [];
+        const serviceName = nameInput.value.trim();
+        const serviceIcon = iconSelect.value;
+        const serviceDuration = parseInt(durationInput.value, 10);
+        const servicePrice = parseInt(priceInput.value, 10);
+        const isActive = activeCheckbox.checked;
+
+        if (!serviceName) { isValid = false; errorMessages.push("El nombre del servicio no puede estar vacío."); nameInput.style.borderColor = 'var(--error-alt-color)'; } else { nameInput.style.borderColor = ''; }
+        if (isNaN(serviceDuration) || serviceDuration <= 0 || serviceDuration % SLOT_INTERVAL_MINUTES !== 0) { isValid = false; errorMessages.push(`La duración debe ser un número positivo múltiplo de ${SLOT_INTERVAL_MINUTES}.`); durationInput.style.borderColor = 'var(--error-alt-color)'; } else { durationInput.style.borderColor = ''; }
+        if (isNaN(servicePrice) || servicePrice < 0) { isValid = false; errorMessages.push("El precio debe ser un número positivo o cero."); priceInput.style.borderColor = 'var(--error-alt-color)'; } else { priceInput.style.borderColor = ''; }
+
+        if (!isValid) {
+            showFeedback(servicesAdminFeedback, `Error en el formulario: ${errorMessages.join(' ')}`, 'error', 5000);
+            return;
+        }
 
         const servicePath = `${SERVICES_PATH}/${id}`;
-        const updatedServiceData = { id, name, icon, duration: dur, price, active }; // Ensure ID is part of the object being saved
+        // Asegurarse que el ID original se mantiene en el objeto guardado
+        const updatedServiceData = { id: id, name: serviceName, icon: serviceIcon, duration: serviceDuration, price: servicePrice, active: isActive };
 
         try {
-            await saveDataFirebase(servicePath, updatedServiceData); // Overwrite the specific service by its ID path
-            showFeedback(servicesAdminFeedback, `Servicio "${name}" actualizado.`, 'success');
+            await saveDataFirebase(servicePath, updatedServiceData); // Usar saveDataFirebase para sobrescribir el objeto completo en esa ruta
+            showFeedback(servicesAdminFeedback, `Servicio "${serviceName}" actualizado correctamente.`, 'success');
         } catch (error) {
-            showFeedback(servicesAdminFeedback, `Error al actualizar: ${error.message}`, 'error');
+            showFeedback(servicesAdminFeedback, `Error al actualizar el servicio: ${error.message}`, 'error');
         } finally {
-            if (addNewServiceButton) addNewServiceButton.disabled = false;
-            await loadServicesAdminUI();
+            if (addNewServiceButton) addNewServiceButton.disabled = false; // Rehabilitar "Añadir Nuevo"
+            await loadServicesAdminUI(); // Recargar la lista para mostrar los cambios
         }
     }
 
-    async function handleCancelEdit() { // No ID needed, just reloads UI
+    async function handleCancelEdit() {
         if (addNewServiceButton) addNewServiceButton.disabled = false;
-        await loadServicesAdminUI();
-        showFeedback(servicesAdminFeedback, 'Edición cancelada.', '', 3000);
+        await loadServicesAdminUI(); // Simplemente recarga la lista para descartar el formulario de edición
+        showFeedback(servicesAdminFeedback, 'Edición cancelada por el usuario.', '', 3000);
     }
 
     async function handleToggleActiveService(id) {
@@ -562,13 +836,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const service = snapshot.val();
                 const newActiveState = !service.active;
                 await updateDataFirebase(servicePath, { active: newActiveState });
-                showFeedback(servicesAdminFeedback, `Servicio "${service.name}" ${newActiveState ? 'activado' : 'desactivado'}.`, 'success');
+                showFeedback(servicesAdminFeedback, `Servicio "${service.name}" ahora está ${newActiveState ? 'ACTIVO' : 'INACTIVO'}.`, 'success');
                 await loadServicesAdminUI();
             } else {
-                showFeedback(servicesAdminFeedback, `Error: Servicio no encontrado.`, 'error');
+                showFeedback(servicesAdminFeedback, `Error: Servicio con ID ${id} no encontrado.`, 'error');
             }
         } catch (error) {
-            showFeedback(servicesAdminFeedback, `Error al cambiar estado: ${error.message}`, 'error');
+            showFeedback(servicesAdminFeedback, `Error al cambiar estado del servicio: ${error.message}`, 'error');
         }
     }
 
@@ -577,68 +851,98 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const snapshot = await get(child(ref(database), servicePath));
             if (!snapshot.exists()) {
-                showFeedback(servicesAdminFeedback, `Error: Servicio no encontrado.`, 'error'); return;
+                showFeedback(servicesAdminFeedback, `Error: Servicio con ID ${id} no encontrado.`, 'error'); return;
             }
-            const svc = snapshot.val();
-            if (window.confirm(`¿Seguro ELIMINAR "${svc.name}"?\n\nNo se podrá deshacer.`)) {
+            const service = snapshot.val();
+            if (window.confirm(`¿Está seguro de que desea ELIMINAR el servicio "${service.name}"?\n\nEsta acción no se puede deshacer.`)) {
                 await removeDataFirebase(servicePath);
-                showFeedback(servicesAdminFeedback, `Servicio "${svc.name}" eliminado.`, 'success');
+                showFeedback(servicesAdminFeedback, `Servicio "${service.name}" eliminado permanentemente.`, 'success');
                 await loadServicesAdminUI();
             } else {
-                showFeedback(servicesAdminFeedback, 'Eliminación cancelada.', '', 3000);
+                showFeedback(servicesAdminFeedback, 'Eliminación del servicio cancelada.', '', 3000);
             }
         } catch (error) {
-            showFeedback(servicesAdminFeedback, `Error al eliminar: ${error.message}`, 'error');
+            showFeedback(servicesAdminFeedback, `Error al eliminar el servicio: ${error.message}`, 'error');
         }
     }
 
     function handleAddNewService() {
-        if (servicesAdminListContainer.querySelector('.new-service-item') || servicesAdminListContainer.querySelector('.editing')) { showFeedback(servicesAdminFeedback, 'Guarda o cancela edición actual.', 'error'); return; }
-        if (addNewServiceButton) addNewServiceButton.disabled = true;
-        const icons = suggestedIcons.map(i => `<option value="${i.value}">${i.text}</option>`).join('');
-        const el = document.createElement('div'); el.classList.add('service-admin-item', 'new-service-item', 'editing');
-        el.innerHTML = `
+        // Verificar si ya se está añadiendo o editando un servicio
+        if (servicesAdminListContainer.querySelector('.new-service-item') || servicesAdminListContainer.querySelector('.service-admin-item.editing')) {
+            showFeedback(servicesAdminFeedback, 'Por favor, guarda o cancela la adición/edición actual antes de añadir un nuevo servicio.', 'error', 4000);
+            return;
+        }
+        if (addNewServiceButton) addNewServiceButton.disabled = true; // Deshabilitar botón mientras se añade
+
+        const iconOptionsHTML = suggestedIcons.map(icon => `<option value="${icon.value}">${icon.text}</option>`).join('');
+        const newItemElement = document.createElement('div');
+        newItemElement.classList.add('service-admin-item', 'new-service-item', 'editing'); // 'editing' para aplicar estilos de formulario
+        newItemElement.innerHTML = `
             <div class="service-details-edit">
-                 <div class="form-group"> <label for="new-name">Nombre:</label> <input type="text" id="new-name" placeholder="Ej: Corte Premium" required> </div>
-                 <div class="form-group inline"> <label for="new-icon">Icono:</label> <select id="new-icon" class="service-icon-select">${icons}</select> </div>
-                 <div class="form-group inline"> <label for="new-duration">Duración (min):</label> <input type="number" id="new-duration" value="45" min="${SLOT_INTERVAL_MINUTES}" step="${SLOT_INTERVAL_MINUTES}" required> </div>
-                 <div class="form-group inline"> <label for="new-price">Precio ($):</label> <input type="number" id="new-price" value="20000" min="0" step="500" required> </div>
-                 <div class="form-group inline checkbox"> <input type="checkbox" id="new-active" checked> <label for="new-active">Activo</label> </div>
+                 <div class="form-group"> <label for="new-service-name">Nombre del Servicio:</label> <input type="text" id="new-service-name" placeholder="Ej: Corte Clásico Caballero" required> </div>
+                 <div class="form-group inline"> <label for="new-service-icon">Icono:</label> <select id="new-service-icon" class="service-icon-select">${iconOptionsHTML}</select> </div>
+                 <div class="form-group inline"> <label for="new-service-duration">Duración (minutos):</label> <input type="number" id="new-service-duration" value="30" min="${SLOT_INTERVAL_MINUTES}" step="${SLOT_INTERVAL_MINUTES}" required> </div>
+                 <div class="form-group inline"> <label for="new-service-price">Precio ($):</label> <input type="number" id="new-service-price" value="10000" min="0" step="500" required> </div>
+                 <div class="form-group inline checkbox"> <input type="checkbox" id="new-service-active" checked> <label for="new-service-active">Servicio Activo</label> </div>
             </div>
-            <div class="service-actions edit-mode"> <button type="button" class="admin-button success save-new-btn">Guardar Nuevo</button> <button type="button" class="admin-button cancel-new-btn">Cancelar</button> </div>`;
-        servicesAdminListContainer.prepend(el); el.querySelector('#new-name').focus();
-        el.querySelector('.save-new-btn').addEventListener('click', handleSaveNewService);
-        el.querySelector('.cancel-new-btn').addEventListener('click', handleCancelNewService);
+            <div class="service-actions edit-mode">
+                <button type="button" class="admin-button success save-new-service-btn">Guardar Nuevo Servicio</button>
+                <button type="button" class="admin-button cancel-new-service-btn">Cancelar Adición</button>
+            </div>`;
+        servicesAdminListContainer.prepend(newItemElement); // Añadir al principio de la lista
+        const nameInputForFocus = newItemElement.querySelector('#new-service-name');
+        if (nameInputForFocus) nameInputForFocus.focus();
+
+        newItemElement.querySelector('.save-new-service-btn').addEventListener('click', handleSaveNewService);
+        newItemElement.querySelector('.cancel-new-service-btn').addEventListener('click', handleCancelNewService);
     }
 
     async function handleSaveNewService() {
-        const el = servicesAdminListContainer.querySelector('.new-service-item'); if (!el) return;
-        const nameIn = el.querySelector(`#new-name`); const iconSel = el.querySelector(`#new-icon`); const durIn = el.querySelector(`#new-duration`); const priceIn = el.querySelector(`#new-price`); const activeIn = el.querySelector(`#new-active`);
-        let ok = true; let errs = []; const name = nameIn.value.trim(); const icon = iconSel.value; const dur = parseInt(durIn.value, 10); const price = parseInt(priceIn.value, 10); const active = activeIn.checked;
-        if (!name) { ok = false; errs.push("Nombre vacío."); nameIn.style.borderColor = 'var(--error-alt-color)'; } else { nameIn.style.borderColor = ''; }
-        if (isNaN(dur) || dur <= 0 || dur % SLOT_INTERVAL_MINUTES !== 0) { ok = false; errs.push(`Duración múltiplo de ${SLOT_INTERVAL_MINUTES}.`); durIn.style.borderColor = 'var(--error-alt-color)'; } else { durIn.style.borderColor = ''; }
-        if (isNaN(price) || price < 0) { ok = false; errs.push("Precio inválido."); priceIn.style.borderColor = 'var(--error-alt-color)'; } else { priceIn.style.borderColor = ''; }
-        if (!ok) { showFeedback(servicesAdminFeedback, `Error: ${errs.join(' ')}`, 'error', 5000); return; }
+        const newItemElement = servicesAdminListContainer.querySelector('.new-service-item');
+        if (!newItemElement) return;
 
-        const newServiceId = generateUniqueId('svc_'); // Or use Firebase push().key for auto-generated keys
-        const newSvc = { id: newServiceId, name, icon, duration: dur, price, active };
+        const nameInput = newItemElement.querySelector(`#new-service-name`);
+        const iconSelect = newItemElement.querySelector(`#new-service-icon`);
+        const durationInput = newItemElement.querySelector(`#new-service-duration`);
+        const priceInput = newItemElement.querySelector(`#new-service-price`);
+        const activeCheckbox = newItemElement.querySelector(`#new-service-active`);
+
+        let isValid = true; let errorMessages = [];
+        const serviceName = nameInput.value.trim();
+        const serviceIcon = iconSelect.value;
+        const serviceDuration = parseInt(durationInput.value, 10);
+        const servicePrice = parseInt(priceInput.value, 10);
+        const isActive = activeCheckbox.checked;
+
+        if (!serviceName) { isValid = false; errorMessages.push("El nombre del servicio es obligatorio."); nameInput.style.borderColor = 'var(--error-alt-color)'; } else { nameInput.style.borderColor = ''; }
+        if (isNaN(serviceDuration) || serviceDuration <= 0 || serviceDuration % SLOT_INTERVAL_MINUTES !== 0) { isValid = false; errorMessages.push(`La duración debe ser un número positivo múltiplo de ${SLOT_INTERVAL_MINUTES}.`); durationInput.style.borderColor = 'var(--error-alt-color)'; } else { durationInput.style.borderColor = ''; }
+        if (isNaN(servicePrice) || servicePrice < 0) { isValid = false; errorMessages.push("El precio debe ser un número positivo o cero."); priceInput.style.borderColor = 'var(--error-alt-color)'; } else { priceInput.style.borderColor = ''; }
+
+        if (!isValid) {
+            showFeedback(servicesAdminFeedback, `Error en el formulario: ${errorMessages.join(' ')}`, 'error', 5000);
+            return;
+        }
+
+        const newServiceId = generateUniqueId('svc_'); // Generar un ID único para el nuevo servicio
+        const newServiceData = { id: newServiceId, name: serviceName, icon: serviceIcon, duration: serviceDuration, price: servicePrice, active: isActive };
         const newServicePath = `${SERVICES_PATH}/${newServiceId}`;
 
         try {
-            await saveDataFirebase(newServicePath, newSvc);
-            showFeedback(servicesAdminFeedback, `Nuevo servicio "${name}" añadido.`, 'success');
+            await saveDataFirebase(newServicePath, newServiceData);
+            showFeedback(servicesAdminFeedback, `Nuevo servicio "${serviceName}" añadido exitosamente.`, 'success');
         } catch (error) {
-            showFeedback(servicesAdminFeedback, `Error al añadir: ${error.message}`, 'error');
+            showFeedback(servicesAdminFeedback, `Error al añadir el nuevo servicio: ${error.message}`, 'error');
         } finally {
-            if (addNewServiceButton) addNewServiceButton.disabled = false;
-            await loadServicesAdminUI();
+            if (addNewServiceButton) addNewServiceButton.disabled = false; // Rehabilitar botón
+            await loadServicesAdminUI(); // Recargar la lista para mostrar el nuevo servicio y quitar el formulario
         }
     }
 
     async function handleCancelNewService() {
-        const el = servicesAdminListContainer.querySelector('.new-service-item'); if (el) el.remove();
-        if (addNewServiceButton) addNewServiceButton.disabled = false;
-        showFeedback(servicesAdminFeedback, 'Añadir cancelado.', '', 3000);
+        const newItemElement = servicesAdminListContainer.querySelector('.new-service-item');
+        if (newItemElement) newItemElement.remove(); // Quitar el formulario de la UI
+        if (addNewServiceButton) addNewServiceButton.disabled = false; // Rehabilitar botón
+        showFeedback(servicesAdminFeedback, 'Adición de nuevo servicio cancelada.', '', 3000);
     }
 
 
@@ -649,19 +953,17 @@ document.addEventListener('DOMContentLoaded', () => {
         tabButtons.forEach(button => button.addEventListener('click', handleTabClick));
         if (standardScheduleForm) standardScheduleForm.addEventListener('submit', handleSaveStandardSchedule);
         if (addNewServiceButton) addNewServiceButton.addEventListener('click', handleAddNewService);
-        // onAuthStateChanged handles the initial check, so no explicit call to checkLoginStatus() needed.
+        // onAuthStateChanged maneja la revisión inicial del estado de login.
     }
 
     // --- Go! ---
-    // Ensure Firebase services are loaded before initializing the panel
     if (window.firebaseServices) {
         initializeAdminPanel();
     } else {
-        // Fallback or error if Firebase SDK didn't load, though it should be available from admin.html
         console.error("Firebase services not available. Admin panel might not work correctly.");
         const loginErrorEl = document.getElementById('login-error');
         if (loginErrorEl) {
-            loginErrorEl.textContent = "Error al cargar Firebase. Intenta recargar la página.";
+            loginErrorEl.textContent = "Error crítico: No se pudieron cargar los servicios de Firebase. Intenta recargar la página.";
             loginErrorEl.style.display = 'block';
         }
     }
