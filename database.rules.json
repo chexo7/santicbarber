@@ -1,38 +1,54 @@
 {
   "rules": {
-    // Publicly readable data (services, schedule, blocked slots for client-side checks)
+    // --- Nodos de Configuración (Servicios, Horario, Bloqueos) ---
+    // Lectura pública para que la página de reservas funcione.
+    // Escritura solo para el administrador.
     "services": {
       ".read": true,
-      ".write": "auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2'" // Replace with actual Admin Firebase UID
+      // Solo el administrador puede escribir (crear, modificar, eliminar) servicios.
+      ".write": "auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2'",
+      // Validación opcional para la estructura de cada servicio cuando el admin escribe
+      "$serviceId": {
+        ".validate": "newData.hasChildren(['id', 'name', 'duration', 'price', 'active']) || !newData.exists()"
+      }
     },
     "standardSchedule": {
       ".read": true,
-      ".write": "auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2'" // Replace with actual Admin Firebase UID
+      // Solo el administrador puede escribir el horario estándar.
+      ".write": "auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2'"
+      // Puedes añadir validaciones más granulares por día si es necesario.
     },
     "blockedSlots": {
       ".read": true,
-      ".write": "auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2'" // Replace with actual Admin Firebase UID
+      // Solo el administrador puede escribir bloqueos específicos.
+      ".write": "auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2'"
+      // Puedes añadir validaciones para la estructura de los bloqueos si es necesario.
     },
-    // Appointments:
-    // Users can create (write) their own appointments.
-    // Admin can read all and write/update all.
+
+    // --- Nodo de Citas (Appointments) ---
     "appointments": {
-      ".read": "auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2'", // Admin can read all
+      // Solo el administrador puede leer la lista completa de citas.
+      ".read": "auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2'",
+      // Solo el administrador puede escribir directamente en el nodo raíz de appointments
+      // (por ejemplo, para borrar todas las citas, lo cual es destructivo).
+      ".write": "auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2'",
+
+      // Reglas para citas individuales (bajo /appointments/$appointmentId)
       "$appointmentId": {
-        // New appointments can be written by anyone (client-side booking)
-        // For more security, you might validate data here or use Cloud Functions.
-        ".write": "newData.exists() || (auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2')",
-        // Admin can update/delete existing appointments
-        ".validate": "newData.hasChildren(['id', 'name', 'phone', 'email', 'serviceId', 'date', 'time', 'status', 'requestedAt'])"
+        // El administrador puede leer citas individuales (ya cubierto por la regla ".read" del padre).
+
+        // Reglas de escritura para citas individuales:
+        // 1. Si la cita NO existe (!data.exists()) Y se está escribiendo nueva data (newData.exists()),
+        //    permite la escritura (esto es CREACIÓN, cualquiera puede hacerlo).
+        // 2. O SI la cita SÍ existe (data.exists()) Y el usuario autenticado es el administrador,
+        //    permite la escritura (esto es MODIFICACIÓN o ELIMINACIÓN, solo el admin puede hacerlo).
+        ".write": "(!data.exists() && newData.exists()) || (data.exists() && auth != null && auth.uid === 'CTedcSU9XuV2QBbTdTilDHuCgAj2')",
+
+        // Validación de la estructura de los datos de la cita:
+        // - Si se está eliminando la cita (newData no existe), la validación pasa.
+        // - Si se está creando o actualizando, la nueva data DEBE tener los campos especificados.
+        ".validate": "!newData.exists() || newData.hasChildren(['id', 'name', 'phone', 'email', 'serviceId', 'date', 'time', 'status', 'requestedAt'])"
       }
-    },
-    // Fallback to the rules you requested for now, but the above is more secure.
-    // If you want to keep it completely open for now as requested:
-    // ".read": true,
-    // ".write": true
-    // However, for production, this is highly insecure.
-    // The rules below are the ones you specified, uncomment them and comment out the more secure ones above if you insist.
-     ".read": true,
-     ".write": true
+    }
   }
 }
