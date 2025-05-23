@@ -763,5 +763,9 @@ footer {
     .time-slot-option { padding: 0.7rem 0.4rem; font-size: 0.9rem; }
 
     /* Optional: Hide background animation on small devices for performance */
-    /* #background-animation-container { display: none; } */
+@media (max-width: 768px) {
+    #background-animation-container {
+        display: none;
+    }
+}
 }

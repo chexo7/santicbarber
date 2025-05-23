@@ -1,17 +1,22 @@
 document.addEventListener('DOMContentLoaded', function() {
 
     // --- Firebase Services (from global scope) ---
+    // Destructure with fallbacks, and ensure all needed services are listed
     const {
-        database, ref, set, get, child
-    } = window.firebaseServices || {}; // Add a fallback if firebaseServices is not loaded
+        database,
+        ref,
+        set,
+        get,
+        child,
+        push: fbPush, // Renamed to avoid conflict if 'push' is used as a variable
+        serverTimestamp: fbServerTimestamp // Renamed for clarity
+    } = window.firebaseServices || {};
 
     // --- Constantes ---
-    // Firebase DB Paths
     const APPOINTMENTS_PATH = 'appointments';
     const BLOCKED_SLOTS_PATH = 'blockedSlots';
     const STANDARD_SCHEDULE_PATH = 'standardSchedule';
     const SERVICES_PATH = 'services';
-
     const MAX_BOOKING_DAYS_AHEAD = 14;
     const SLOT_INTERVAL_MINUTES = 30;
 
@@ -66,67 +71,68 @@ document.addEventListener('DOMContentLoaded', function() {
     maxBookingDate.setHours(23, 59, 59, 999);
     let currentSelectedServiceDuration = null;
 
-
     // --- Funciones Auxiliares (Firebase Data) ---
     async function loadDataFirebase(path, defaultValue = {}) {
-        if (!database || !ref || !get || !child) { // Check if Firebase services are available
-            console.error("Firebase Database services are not available on the public page.");
-            displayMessage('Error de conexión con la base de datos. Intenta más tarde.', 'error');
-            return defaultValue;
+        if (!database || !ref || !get || !child) {
+            console.error("Firebase Database services (database, ref, get, or child) are not available.");
+            throw new Error("Servicio de base de datos no inicializado correctamente.");
         }
         try {
             const snapshot = await get(child(ref(database), path));
             if (snapshot.exists()) {
                 return snapshot.val();
             } else {
-                console.log(`No data available at Firebase path: ${path}. Returning default.`);
+                console.log(`No data available at Firebase path: ${path}. Returning default value.`);
                 return defaultValue;
             }
         } catch (error) {
             console.error(`Error loading data from Firebase path ${path}:`, error);
-            // Avoid showing generic feedback for every load error on public page,
-            // specific errors handled by calling functions.
-            return defaultValue;
+            throw error; 
         }
     }
 
     async function saveDataFirebase(path, data) {
-         if (!database || !ref || !set) {
-            console.error("Firebase Database services for saving are not available.");
-            throw new Error("Servicio de base de datos no disponible para guardar.");
+        if (!database || !ref || !set) {
+            console.error("Firebase Database services for saving (database, ref, or set) are not available.");
+            throw new Error("Servicio de base de datos no disponible para guardar. Por favor, reintente más tarde.");
         }
         try {
             await set(ref(database, path), data);
             console.log(`Data saved to Firebase path ${path}:`, data);
         } catch (error) {
             console.error(`Error saving data to Firebase path ${path}:`, error);
-            throw error;
+            throw new Error(`Error al guardar los datos: ${error.message || 'Error desconocido'}. Por favor, intente de nuevo.`);
         }
     }
 
-    // --- Funciones Auxiliares (Generales - sin cambios mayores) ---
+    // --- Funciones Auxiliares (Generales) ---
     function formatDateToYMD(date) { if (!(date instanceof Date) || isNaN(date.getTime())) return null; const y = date.getFullYear(); const m = String(date.getMonth() + 1).padStart(2, '0'); const d = String(date.getDate()).padStart(2, '0'); return `${y}-${m}-${d}`; }
     function formatDateDMY(dateStringYMD) { if (!dateStringYMD || !/^\d{4}-\d{2}-\d{2}$/.test(dateStringYMD)) return dateStringYMD; try { const [y, m, d] = dateStringYMD.split('-'); if (parseInt(m, 10) < 1 || parseInt(m, 10) > 12 || parseInt(d, 10) < 1 || parseInt(d, 10) > 31) { return dateStringYMD; } return `${d}/${m}/${y}`; } catch (e) { console.warn("Could not format date D/M/Y:", dateStringYMD, e); return dateStringYMD; } }
     function formatPrice(value) { const number = Number(value); if (isNaN(number) || value === null || value === undefined || number < 0) return '-'; if (number === 0) return 'Gratis'; return `$${number.toLocaleString('es-CL')}`; }
     function timeToMinutes(timeStr) { if (!timeStr || !/^\d{1,2}:\d{2}$/.test(timeStr)) return null; try { const parts = timeStr.split(':'); const h = parseInt(parts[0], 10); const m = parseInt(parts[1], 10); if (h < 0 || h > 23 || m < 0 || m > 59) return null; return h * 60 + m; } catch (e) { console.warn("Could not convert time to minutes:", timeStr, e); return null; } }
     function minutesToTime(totalMinutes) { if (totalMinutes === null || totalMinutes < 0 || isNaN(totalMinutes)) return null; const h = Math.floor(totalMinutes / 60) % 24; const m = totalMinutes % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`; }
-    function generateUniqueId(prefix = 'appt_') { // Firebase push keys are better for lists. This is for a single object ID.
-        // Create a new reference with a unique key
-        // This is a placeholder, actual Firebase push key generation is different.
-        // For appointments, we'll use Firebase's push mechanism.
-        return prefix + Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
-    }
+    // generateUniqueId is removed as it's no longer used for appointment IDs.
     function isValidName(name) { if (!name) return false; return name.trim().split(' ').filter(part => part.length > 1).length >= 2; }
     function isValidEmail(email) { if (!email) return false; const emailRegex = new RegExp(/^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/); return emailRegex.test(String(email).toLowerCase()); }
     function displayHint(hintElement, message, isValid, inputElement = null) { if (!hintElement) return; hintElement.textContent = message; if (message && !isValid) { hintElement.classList.add('visible'); inputElement?.classList.add('invalid'); } else { hintElement.classList.remove('visible'); inputElement?.classList.remove('invalid'); } }
 
     // --- Cargar Servicios en Booking Page ---
     async function loadBookingPageServices() {
-        if (!serviceSelect || !servicesGridContainer) return;
+        if (!serviceSelect || !servicesGridContainer) return false;
         serviceSelect.innerHTML = '<option value="" disabled selected>Cargando servicios...</option>';
         servicesGridContainer.innerHTML = '<p class="loading-placeholder">Cargando servicios...</p>';
+        let servicesData;
+        try {
+            servicesData = await loadDataFirebase(SERVICES_PATH, null); 
+            if (servicesData === null) throw new Error("Services data could not be loaded (returned null).");
+        } catch (error) {
+            console.error("Error in loadBookingPageServices:", error);
+            const userErrorMessage = "Error al cargar servicios. Intente más tarde.";
+            if (serviceSelect) serviceSelect.innerHTML = `<option value="" disabled selected>${userErrorMessage}</option>`;
+            if (servicesGridContainer) servicesGridContainer.innerHTML = `<p class="placeholder error-message">${userErrorMessage}</p>`;
+            return false; 
+        }
 
-        const servicesData = await loadDataFirebase(SERVICES_PATH, {});
         const allServices = servicesData ? Object.values(servicesData) : [];
         const activeServices = allServices.filter(s => s && s.active);
 
@@ -135,7 +141,9 @@ document.addEventListener('DOMContentLoaded', function() {
             serviceSelect.innerHTML = '<option value="" disabled selected>-- Elige un servicio --</option>';
             if (activeServices.length === 0) {
                 const option = document.createElement('option');
-                option.value = ""; option.textContent = "No hay servicios disponibles"; option.disabled = true;
+                option.value = "";
+                option.textContent = (Object.keys(servicesData).length === 0) ? "No hay servicios configurados." : "No hay servicios activos.";
+                option.disabled = true;
                 serviceSelect.appendChild(option);
             } else {
                 activeServices.forEach(service => {
@@ -146,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     option.dataset.icon = service.icon || '';
                     serviceSelect.appendChild(option);
                 });
-                if (activeServices.some(s => s.id === currentSelection)) { serviceSelect.value = currentSelection; }
+                if (activeServices.some(s => s.id === currentSelection)) serviceSelect.value = currentSelection;
             }
             serviceSelect.dispatchEvent(new Event('change'));
         }
@@ -154,7 +162,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (servicesGridContainer) {
             servicesGridContainer.innerHTML = '';
             if (activeServices.length === 0) {
-                servicesGridContainer.innerHTML = '<p class="placeholder">No hay servicios para mostrar.</p>';
+                servicesGridContainer.innerHTML = (Object.keys(servicesData).length === 0) ?
+                    '<p class="placeholder">No hay servicios configurados para mostrar.</p>' :
+                    '<p class="placeholder">No hay servicios activos para mostrar.</p>';
             } else {
                 activeServices.forEach(service => {
                     const serviceItem = document.createElement('div');
@@ -163,19 +173,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span class="service-icon">${service.icon || '✂️'}</span>
                         <h3>${service.name}</h3>
                         <p>${getServiceDescription(service.id, allServices)}</p>
-                        <p class="service-price" data-service-id="${service.id}">${formatPrice(service.price)}</p>
-                    `;
+                        <p class="service-price" data-service-id="${service.id}">${formatPrice(service.price)}</p>`;
                     servicesGridContainer.appendChild(serviceItem);
                 });
             }
         }
+        return true; 
     }
 
     function getServiceDescription(serviceId, allServices) {
         const service = allServices.find(s => s.id === serviceId);
-        if (service && service.description) return service.description; // If you add a description field
+        if (service && service.description) return service.description;
         if (service) {
-            // Fallback descriptions based on name (as before)
             if (service.name.toLowerCase().includes('junior')) return "Corte adaptado para los más jóvenes (2 a 12 años).";
             if (service.name.toLowerCase().includes('facial')) return "Renueva tu piel con nuestra limpieza profunda.";
             if (service.name.toLowerCase().includes('afeitada')) return "Experiencia clásica con navaja y toallas calientes.";
@@ -184,24 +193,32 @@ document.addEventListener('DOMContentLoaded', function() {
             if (service.name.toLowerCase().includes('rasurado')) return "Un rasurado perfecto y suave para tu cabeza.";
             if (service.name.toLowerCase().includes('peinado')) return "Dale el toque final a tu look con un peinado profesional.";
         }
-        return "Servicio de barbería profesional."; // Generic fallback
+        return "Servicio de barbería profesional.";
     }
 
-    // --- Lógica Selector Día/Hora ---
     async function generateDayOptions() {
-        if (!dayOptionsContainer || !hiddenDateInput) return;
+        if (!dayOptionsContainer || !hiddenDateInput) return false;
         dayOptionsContainer.innerHTML = '<span class="loading-placeholder">Cargando días...</span>';
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const displayDates = [];
         let tempDate = new Date(currentDaySelectorStartDate);
-        const standardScheduleData = await loadDataFirebase(STANDARD_SCHEDULE_PATH, {});
-        let safetyCount = 0;
+        let standardScheduleData;
+        try {
+            standardScheduleData = await loadDataFirebase(STANDARD_SCHEDULE_PATH, null);
+            if (standardScheduleData === null) throw new Error("Standard schedule data could not be loaded.");
+        } catch (error) {
+            console.error("Error in generateDayOptions loading schedule:", error);
+            if (dayOptionsContainer) dayOptionsContainer.innerHTML = `<span class="loading-placeholder error-message">Error al cargar disponibilidad. Intente más tarde.</span>`;
+            if (prevDayButton) prevDayButton.disabled = true;
+            if (nextDayButton) nextDayButton.disabled = true;
+            return false; 
+        }
 
+        let safetyCount = 0;
         while (displayDates.length < daysToShowInSelector && tempDate <= maxBookingDate && safetyCount < MAX_BOOKING_DAYS_AHEAD * 3) {
             const dayOfWeek = tempDate.getDay();
             const dayStandard = standardScheduleData[dayOfWeek] || { open: dayOfWeek !== 0, morningOpen: dayOfWeek !== 0, afternoonOpen: dayOfWeek !== 0 };
             const isDayEffectivelyOpen = dayStandard.open && (dayStandard.morningOpen || dayStandard.afternoonOpen);
-
             if (isDayEffectivelyOpen && tempDate >= today && tempDate <= maxBookingDate) {
                 displayDates.push(new Date(tempDate));
             }
@@ -232,6 +249,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         updateDayNavButtons(displayDates.length > 0 ? displayDates[displayDates.length - 1] : null);
+        return true; 
     }
 
     function updateDayNavButtons(lastDateShown) {
@@ -253,9 +271,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         hiddenDateInput.value = newSelectedDate;
         hiddenTimeInput.value = '';
-        await displayTimeSlots(newSelectedDate);
+        await displayTimeSlots(newSelectedDate); 
         displayHint(dateHint, '', true);
-        displayHint(timeHint, 'Selecciona una hora.', false);
+        displayHint(timeHint, 'Selecciona una hora.', false); 
         if (timeSlotsContainer) {
             timeSlotsContainer.style.display = 'block';
             timeSlotsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -264,26 +282,43 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function displayTimeSlots(selectedDateStr) {
-        if (!timeOptionsContainer || !hiddenTimeInput) return;
+        if (!timeOptionsContainer || !hiddenTimeInput) return false;
         timeOptionsContainer.innerHTML = '<span class="loading-placeholder">Cargando horarios...</span>';
         hiddenTimeInput.value = '';
 
-        if (!selectedDateStr || !/^\d{4}-\d{2}-\d{2}$/.test(selectedDateStr)) { timeOptionsContainer.innerHTML = '<span class="loading-placeholder">Fecha inválida.</span>'; displayHint(dateHint, 'Fecha inválida.', false); return; }
-
+        if (!selectedDateStr || !/^\d{4}-\d{2}-\d{2}$/.test(selectedDateStr)) {
+            timeOptionsContainer.innerHTML = '<span class="loading-placeholder error-message">Fecha inválida.</span>';
+            displayHint(dateHint, 'Fecha inválida.', false); return false;
+        }
         const serviceDuration = currentSelectedServiceDuration;
         if (!serviceDuration || serviceDuration <= 0) {
             timeOptionsContainer.innerHTML = '<span class="loading-placeholder">Selecciona un servicio válido primero.</span>';
             displayHint(timeHint, 'Selecciona un servicio para ver horarios.', false);
-            return;
+            return false;
         }
 
-        const standardScheduleData = await loadDataFirebase(STANDARD_SCHEDULE_PATH, {});
-        const blockedExceptionsData = await loadDataFirebase(BLOCKED_SLOTS_PATH, {});
-        const allAppointmentsData = await loadDataFirebase(APPOINTMENTS_PATH, {});
-        const allServicesData = await loadDataFirebase(SERVICES_PATH, {});
+        let standardScheduleData, blockedExceptionsData, allAppointmentsData, allServicesData;
+        try {
+            standardScheduleData = await loadDataFirebase(STANDARD_SCHEDULE_PATH, null);
+            blockedExceptionsData = await loadDataFirebase(BLOCKED_SLOTS_PATH, {}); 
+            allAppointmentsData = await loadDataFirebase(APPOINTMENTS_PATH, {});   
+            allServicesData = await loadDataFirebase(SERVICES_PATH, null);
+
+            if (standardScheduleData === null || allServicesData === null) {
+                throw new Error("Essential data for time slots (schedule or services) could not be loaded.");
+            }
+        } catch (error) {
+            console.error("Error in displayTimeSlots loading Firebase data:", error);
+            if (timeOptionsContainer) timeOptionsContainer.innerHTML = '<span class="loading-placeholder error-message">Error al cargar horarios. Intente más tarde.</span>';
+            return false; 
+        }
 
         const date = new Date(selectedDateStr + 'T00:00:00');
-        if (isNaN(date.getTime())) { timeOptionsContainer.innerHTML = '<span class="loading-placeholder">Error fecha.</span>'; displayHint(dateHint, 'Error procesando fecha.', false); return; }
+        if (isNaN(date.getTime())) {
+            timeOptionsContainer.innerHTML = '<span class="loading-placeholder error-message">Error procesando fecha.</span>';
+            displayHint(dateHint, 'Error procesando fecha.', false); return false;
+        }
+
         const dayOfWeek = date.getDay();
         const dayStandard = standardScheduleData[dayOfWeek] || { open: false, morningOpen: false, afternoonOpen: false };
         const explicitlyBlockedTimes = (blockedExceptionsData && blockedExceptionsData[selectedDateStr]) ? blockedExceptionsData[selectedDateStr] : [];
@@ -294,7 +329,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .filter(a => a.date === selectedDateStr && (a.status === 'pending' || a.status === 'confirmed'))
             .map(a => {
                 const service = allServices.find(s => s.id === a.serviceId);
-                const duration = service ? (service.duration || 60) : 60;
+                const duration = service ? (service.duration || 60) : 60; 
                 return { time: a.time, duration: duration };
             })
             .filter(a => a.time);
@@ -302,9 +337,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const now = new Date(); const todayDateStr = formatDateToYMD(now);
         const isToday = (selectedDateStr === todayDateStr);
         const currentMinutes = isToday ? (now.getHours() * 60 + now.getMinutes()) : -1;
-        const bufferMinutes = 5;
+        const bufferMinutes = 5; 
 
-        timeOptionsContainer.innerHTML = ''; // Clear loading
+        timeOptionsContainer.innerHTML = ''; 
         let hasAvailableSlots = false;
 
         baseTimeSlots.forEach(time => {
@@ -354,12 +389,17 @@ document.addEventListener('DOMContentLoaded', function() {
             timeOptionsContainer.appendChild(timeButton);
         });
 
-        if (!hasAvailableSlots) { timeOptionsContainer.innerHTML = '<span class="loading-placeholder">No hay horarios disponibles para este día.</span>'; displayHint(timeHint, 'No hay horarios disponibles.', false); }
-        else if (hiddenTimeInput.value === '') { displayHint(timeHint, 'Selecciona una hora.', false); }
-        else { displayHint(timeHint, '', true); }
+        if (!hasAvailableSlots) {
+            timeOptionsContainer.innerHTML = '<span class="loading-placeholder">No hay horarios disponibles para este día.</span>';
+            displayHint(timeHint, 'No hay horarios disponibles.', false);
+        } else if (hiddenTimeInput.value === '') {
+            displayHint(timeHint, 'Selecciona una hora.', false);
+        } else {
+            displayHint(timeHint, '', true);
+        }
         validateFormAndToggleButton();
+        return true; 
     }
-
 
     function handleTimeSelection(event) {
         const selectedButton = event.currentTarget;
@@ -378,9 +418,17 @@ document.addEventListener('DOMContentLoaded', function() {
     async function navigateDays(direction) {
         let change = direction * dayScrollAmount; let safetyCounter = 0;
         let newStartDate = new Date(currentDaySelectorStartDate);
-        const scheduleData = await loadDataFirebase(STANDARD_SCHEDULE_PATH, {}); // Load schedule for checking
-        const today = new Date(); today.setHours(0, 0, 0, 0);
+        let scheduleData;
+        try {
+            scheduleData = await loadDataFirebase(STANDARD_SCHEDULE_PATH, null);
+            if (scheduleData === null) throw new Error("Failed to load schedule for day navigation.");
+        } catch (error) {
+            console.error("Error in navigateDays loading schedule:", error);
+            displayMessage("Error al cargar la disponibilidad para navegación. Intente más tarde.", "error");
+            return;
+        }
 
+        const today = new Date(); today.setHours(0, 0, 0, 0);
         while (change !== 0 && safetyCounter < MAX_BOOKING_DAYS_AHEAD * 4) {
             const potentialNextDate = new Date(newStartDate); potentialNextDate.setDate(potentialNextDate.getDate() + direction);
             if (direction > 0 && potentialNextDate > maxBookingDate) break; if (direction < 0 && potentialNextDate < today) break;
@@ -404,13 +452,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         currentDaySelectorStartDate = newStartDate;
-        await generateDayOptions();
+        await generateDayOptions(); 
         hiddenDateInput.value = ''; hiddenTimeInput.value = '';
         if (timeSlotsContainer) timeSlotsContainer.style.display = 'none';
-        displayHint(dateHint, 'Selecciona un día.', false); displayHint(timeHint, '', true);
+        displayHint(dateHint, 'Selecciona un día.', false); displayHint(timeHint, '', true); 
         validateFormAndToggleButton();
     }
-
 
     function setupDayNavigation() {
         if (prevDayButton) prevDayButton.addEventListener('click', () => navigateDays(-1));
@@ -421,7 +468,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!serviceSelect || !otherServiceGroup || !otherServiceTextarea) return;
         const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
         const isOtherSelected = selectedOption && selectedOption.text.toLowerCase().includes('otro');
-
         if (isOtherSelected) {
             otherServiceGroup.style.display = 'block';
             otherServiceTextarea.required = true;
@@ -446,7 +492,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const otherServiceOption = serviceSelect ? serviceSelect.options[serviceSelect.selectedIndex] : null;
         const isOtherSelected = otherServiceOption && otherServiceOption.text.toLowerCase().includes('otro');
         const otherServiceValid = !isOtherSelected || (otherServiceTextarea?.value.trim().length > 0);
-
         const isFormValid = nameValid && phoneValid && emailValid && serviceValid && dateSelected && timeSelected && termsValid && otherServiceValid;
         submitButton.disabled = !isFormValid;
     }
@@ -477,7 +522,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!bookingForm || !submitButton) return;
         bookingForm.addEventListener('submit', async function(event) {
             event.preventDefault();
-            displayMessage('', 'clear');
+            displayMessage('', 'clear'); 
 
             let firstInvalidElement = null;
             const nameValid = isValidName(nameInput?.value); if (!nameValid) { displayHint(nameHint, 'Nombre y apellido.', false, nameInput); if (!firstInvalidElement) firstInvalidElement = nameInput; } else { displayHint(nameHint, '', true, nameInput); }
@@ -494,23 +539,30 @@ document.addEventListener('DOMContentLoaded', function() {
             else { displayHint(otherServiceHint, '', true, otherServiceTextarea); }
 
             let isSlotStillAvailable = true;
-            if (dateSelected && timeSelected) {
+            if (dateSelected && timeSelected && serviceValid) { 
                 const checkDate = hiddenDateInput.value;
                 const checkTime = hiddenTimeInput.value;
                 const serviceDuration = currentSelectedServiceDuration;
                 if (serviceDuration && serviceDuration > 0) {
-                    isSlotStillAvailable = await checkFinalAvailability(checkDate, checkTime, serviceDuration); // Made async
-                    if (!isSlotStillAvailable) {
-                        displayHint(timeHint, 'Hora ya no disponible. Elige otra.', false);
+                    try {
+                        isSlotStillAvailable = await checkFinalAvailability(checkDate, checkTime, serviceDuration);
+                        if (!isSlotStillAvailable) {
+                            displayHint(timeHint, 'Hora ya no disponible. Elige otra.', false);
+                            if (!firstInvalidElement) firstInvalidElement = timeOptionsContainer;
+                            await displayTimeSlots(checkDate); 
+                            hiddenTimeInput.value = ''; 
+                            const selectedButton = timeOptionsContainer?.querySelector('.time-slot-option.selected');
+                            if (selectedButton) { selectedButton.classList.remove('selected'); selectedButton.setAttribute('aria-pressed', 'false'); }
+                        }
+                    } catch (error) {
+                        console.error("Error during final availability check in handleFormSubmit:", error);
+                        displayMessage(`Error al verificar disponibilidad: ${error.message}. Intente de nuevo.`, "error");
+                        isSlotStillAvailable = false; 
                         if (!firstInvalidElement) firstInvalidElement = timeOptionsContainer;
-                        await displayTimeSlots(checkDate);
-                        hiddenTimeInput.value = '';
-                        const selectedButton = timeOptionsContainer?.querySelector('.time-slot-option.selected');
-                        if (selectedButton) { selectedButton.classList.remove('selected'); selectedButton.setAttribute('aria-pressed', 'false'); }
                     }
                 } else {
                     isSlotStillAvailable = false;
-                    displayHint(serviceHint, 'Error duración servicio.', false, serviceSelect);
+                    displayHint(serviceHint, 'Error en duración del servicio. Selecciona de nuevo.', false, serviceSelect);
                     if (!firstInvalidElement) firstInvalidElement = serviceSelect;
                 }
             }
@@ -523,30 +575,37 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             submitButton.disabled = true; submitButton.textContent = 'Procesando...';
-
             const name = nameInput.value.trim(); const phone = phoneInput.value.trim(); const emailVal = emailInput.value.trim();
             const serviceId = serviceSelect.value;
             const serviceName = serviceSelect.options[serviceSelect.selectedIndex].text;
             const dateValue = hiddenDateInput.value; const timeValue = hiddenTimeInput.value;
             const otherDetailsValue = (isOtherSelected && otherServiceTextarea) ? otherServiceTextarea.value.trim() : null;
+            
+            if (!fbPush || !ref || !database || !fbServerTimestamp) {
+                console.error("Firebase push, ref, database, or serverTimestamp service is not available for creating appointment ID.");
+                displayMessage("Error crítico: No se puede generar ID para la cita. Intente más tarde.", "error");
+                submitButton.disabled = false; submitButton.textContent = 'Confirmar Cita';
+                return;
+            }
 
-            const appointmentId = generateUniqueId('appt_'); // Or use Firebase push().key if you prefer Firebase to generate the ID.
-                                                            // For this example, we generate it client-side to match previous logic.
+            const newAppointmentRef = fbPush(ref(database, APPOINTMENTS_PATH));
+            const appointmentId = newAppointmentRef.key; 
             const appointmentPath = `${APPOINTMENTS_PATH}/${appointmentId}`;
 
             try {
                 const newAppointment = {
-                    id: appointmentId, name, phone, email: emailVal, // ensure email is stored
+                    id: appointmentId, 
+                    name, phone, email: emailVal,
                     serviceId: serviceId, service: serviceName,
                     date: dateValue, time: timeValue, status: 'pending',
-                    requestedAt: new Date().toISOString(), otherDetails: otherDetailsValue
+                    requestedAt: new Date().toISOString(), 
+                    createdAtServer: fbServerTimestamp(), // Using Firebase Server Timestamp
+                    otherDetails: otherDetailsValue
                 };
+                
                 await saveDataFirebase(appointmentPath, newAppointment);
-                console.log('Solicitud guardada en Firebase:', newAppointment);
-
-                const successMessage = `¡Gracias, ${name}! Tu solicitud para '${serviceName}' el ${formatDateDMY(dateValue)} a las ${timeValue} está PENDIENTE de confirmación. Recibirás un correo a ${emailVal} cuando sea aprobada.`;
+                const successMessage = `¡Gracias, ${name}! Tu solicitud para '${serviceName}' el ${formatDateDMY(dateValue)} a las ${timeValue} está PENDIENTE de confirmación. Recibirás un correo a ${emailVal} cuando sea aprobada. ID de cita: ${appointmentId}.`;
                 displayMessage(successMessage, 'success');
-
                 bookingForm.reset();
                 hiddenDateInput.value = ''; hiddenTimeInput.value = ''; currentSelectedServiceDuration = null;
                 if (otherServiceTextarea) otherServiceTextarea.value = ''; if (otherServiceGroup) otherServiceGroup.style.display = 'none';
@@ -554,19 +613,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 timeOptionsContainer?.querySelector('.time-slot-option.selected')?.classList.remove('selected');
                 if (timeSlotsContainer) timeSlotsContainer.style.display = 'none';
                 if (timeOptionsContainer) timeOptionsContainer.innerHTML = '<span class="loading-placeholder">Selecciona un día para ver horarios.</span>';
-                await generateDayOptions();
+                await generateDayOptions(); 
                 updateSelectedServicePrice();
                 [nameHint, phoneHint, emailHint, serviceHint, dateHint, timeHint, termsHint, otherServiceHint].forEach(h => displayHint(h, '', true));
                 [nameInput, phoneInput, emailInput, serviceSelect, otherServiceTextarea].forEach(inp => inp?.classList.remove('invalid'));
-
-                submitButton.textContent = 'Confirmar Cita';
-                validateFormAndToggleButton();
+                submitButton.textContent = 'Confirmar Cita'; 
+                validateFormAndToggleButton(); 
                 confirmationMessageContainer?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
             } catch (error) {
                 console.error("Error guardando cita en Firebase:", error);
                 displayMessage(`Error al procesar tu solicitud: ${error.message}. Inténtalo de nuevo.`, 'error');
-                submitButton.disabled = false;
+                submitButton.disabled = false; 
                 submitButton.textContent = 'Confirmar Cita';
             }
         });
@@ -574,12 +631,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function checkFinalAvailability(dateString, timeString, serviceDuration) {
         const timeMin = timeToMinutes(timeString);
-        if (timeMin === null || !serviceDuration || serviceDuration <= 0) return false;
-
-        const standardScheduleData = await loadDataFirebase(STANDARD_SCHEDULE_PATH, {});
+        if (timeMin === null || !serviceDuration || serviceDuration <= 0) {
+             console.warn("checkFinalAvailability: Invalid time or duration."); return false;
+        }
+        const standardScheduleData = await loadDataFirebase(STANDARD_SCHEDULE_PATH, null); 
         const blockedExceptionsData = await loadDataFirebase(BLOCKED_SLOTS_PATH, {});
         const allAppointmentsData = await loadDataFirebase(APPOINTMENTS_PATH, {});
-        const allServicesData = await loadDataFirebase(SERVICES_PATH, {});
+        const allServicesData = await loadDataFirebase(SERVICES_PATH, null); 
+
+        if (!standardScheduleData || !allServicesData) {
+            throw new Error("No se pudieron cargar los datos necesarios para verificar disponibilidad (horario o servicios).");
+        }
 
         const date = new Date(dateString + 'T00:00:00');
         const dayOfWeek = date.getDay();
@@ -600,16 +662,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const now = new Date(); const todayDateStr = formatDateToYMD(now);
         const isToday = (dateString === todayDateStr);
         const currentMinutes = isToday ? (now.getHours() * 60 + now.getMinutes()) : -1;
-        const bufferMinutes = 0;
+        const bufferMinutes = 0; 
 
-        if (isToday && (timeMin < currentMinutes + bufferMinutes)) return false;
+        if (isToday && (timeMin < currentMinutes + bufferMinutes)) return false; 
 
         const currentSlotStartMin = timeMin;
         const currentSlotEndMin = timeMin + serviceDuration;
         for (const booking of bookedSlotsDetails) {
             const bookingStartMin = timeToMinutes(booking.time); if (bookingStartMin === null) continue;
             const bookingEndMin = bookingStartMin + booking.duration;
-            if (Math.max(currentSlotStartMin, bookingStartMin) < Math.min(currentSlotEndMin, bookingEndMin)) return false;
+            if (Math.max(currentSlotStartMin, bookingStartMin) < Math.min(currentSlotEndMin, bookingEndMin)) return false; 
         }
 
         let isWithinStandardHours = false; const serviceEndMin = timeMin + serviceDuration;
@@ -620,89 +682,122 @@ document.addEventListener('DOMContentLoaded', function() {
             const fitsInAfternoon = (dayStandard.afternoonOpen && aStartMin !== null && aEndMin !== null && timeMin >= aStartMin && serviceEndMin <= aEndMin);
             if (fitsInMorning || fitsInAfternoon) isWithinStandardHours = true;
         }
-        if (!isWithinStandardHours) return false;
+        if (!isWithinStandardHours) return false; 
 
         for (let offset = 0; offset < serviceDuration; offset += SLOT_INTERVAL_MINUTES) {
             const checkTimeStr = minutesToTime(timeMin + offset);
-            if (checkTimeStr && explicitlyBlockedTimes.includes(checkTimeStr)) return false;
+            if (checkTimeStr && explicitlyBlockedTimes.includes(checkTimeStr)) return false; 
         }
-        return true;
+        return true; 
     }
 
     function displayMessage(message, type) {
         if (!confirmationMessageContainer || !confirmationTextSpan || !closeConfirmationButton) return;
         confirmationTextSpan.textContent = message;
-        confirmationMessageContainer.className = 'confirmation-message';
-
+        confirmationMessageContainer.className = 'confirmation-message'; 
         if (type === 'success' || type === 'error') {
             confirmationMessageContainer.classList.add(type);
             confirmationMessageContainer.style.display = 'flex';
             closeConfirmationButton.style.display = (type === 'success') ? 'block' : 'none';
-        } else {
+        } else { 
             confirmationMessageContainer.style.display = 'none';
         }
     }
 
     function setupCloseButtonListener() { if (closeConfirmationButton) { closeConfirmationButton.addEventListener('click', () => { displayMessage('', 'clear'); }); } }
-    function createFallingIcon() { if (!animationContainer) return; const icons = ['✂️', '💈']; const iconsToCreate = 1; const baseFallDuration = 12000; for (let i = 0; i < iconsToCreate; i++) { try { const iconElement = document.createElement('span'); iconElement.classList.add('falling-icon'); iconElement.textContent = icons[Math.floor(Math.random() * icons.length)]; const randomLeft = Math.random() * 98; const randomFontSize = Math.random() * 18 + 12; const randomDuration = Math.random() * 12000 + baseFallDuration; const randomDelay = Math.random() * 8000; const randomStartOpacity = Math.random() * 0.3 + 0.2; const randomEndOpacity = Math.random() * 0.1; iconElement.style.left = `${randomLeft}%`; iconElement.style.fontSize = `${randomFontSize}px`; iconElement.style.setProperty('--start-opacity', randomStartOpacity.toFixed(2)); iconElement.style.setProperty('--end-opacity', randomEndOpacity.toFixed(2)); iconElement.style.animationDuration = `${randomDuration / 1000}s`; iconElement.style.animationDelay = `${randomDelay / 1000}s`; animationContainer.appendChild(iconElement); const totalLife = randomDuration + randomDelay + 1500; setTimeout(() => { if (iconElement.parentNode === animationContainer) { iconElement.remove(); } }, totalLife); } catch (e) { console.error("Error creating falling icon:", e); } } }
+    function createFallingIcon() { if (!animationContainer) return; const icons = ['✂️', '💈']; const iconsToCreate = 1; const baseFallDuration = 12000; try { for (let i = 0; i < iconsToCreate; i++) { const iconElement = document.createElement('span'); iconElement.classList.add('falling-icon'); iconElement.textContent = icons[Math.floor(Math.random() * icons.length)]; const randomLeft = Math.random() * 98; const randomFontSize = Math.random() * 18 + 12; const randomDuration = Math.random() * 12000 + baseFallDuration; const randomDelay = Math.random() * 8000; const randomStartOpacity = Math.random() * 0.3 + 0.2; const randomEndOpacity = Math.random() * 0.1; iconElement.style.left = `${randomLeft}%`; iconElement.style.fontSize = `${randomFontSize}px`; iconElement.style.setProperty('--start-opacity', randomStartOpacity.toFixed(2)); iconElement.style.setProperty('--end-opacity', randomEndOpacity.toFixed(2)); iconElement.style.animationDuration = `${randomDuration / 1000}s`; iconElement.style.animationDelay = `${randomDelay / 1000}s`; animationContainer.appendChild(iconElement); const totalLife = randomDuration + randomDelay + 1500; setTimeout(() => { if (iconElement.parentNode === animationContainer) { iconElement.remove(); } }, totalLife); } } catch(e) { console.error("Error creating falling icon:", e); if (animationContainer) animationContainer.innerHTML = ''; clearInterval(animationIntervalId); } } 
     function setupMobileMenu() { if (!mobileMenuToggle || !mainNav) return; mobileMenuToggle.addEventListener('click', () => { const isActive = mainNav.classList.toggle('active'); mobileMenuToggle.textContent = isActive ? '✕' : '☰'; document.body.style.overflow = isActive ? 'hidden' : ''; mobileMenuToggle.setAttribute('aria-expanded', isActive); }); navLinks.forEach(link => { link.addEventListener('click', () => { if (mainNav.classList.contains('active')) { mainNav.classList.remove('active'); mobileMenuToggle.textContent = '☰'; document.body.style.overflow = ''; mobileMenuToggle.setAttribute('aria-expanded', 'false'); } }); }); document.addEventListener('click', (event) => { const isClickInsideNav = mainNav.contains(event.target); const isClickOnToggle = mobileMenuToggle.contains(event.target); if (!isClickInsideNav && !isClickOnToggle && mainNav.classList.contains('active')) { mainNav.classList.remove('active'); mobileMenuToggle.textContent = '☰'; document.body.style.overflow = ''; mobileMenuToggle.setAttribute('aria-expanded', 'false'); } }); }
     function updateFooterYear() { if (currentYearSpan) { currentYearSpan.textContent = new Date().getFullYear(); } }
 
-    // --- Inicialización ---
-    async function initializePage() { // Made async
+    let animationIntervalId = null; 
+
+    async function initializePage() {
         updateFooterYear();
         setupMobileMenu();
         setupCloseButtonListener();
 
-        if (!window.firebaseServices) {
-            console.error("Firebase services not loaded on public page. Functionality will be limited.");
-            displayMessage("Error de conexión. No se pueden cargar los datos de la barbería.", "error");
-            if (serviceSelect) serviceSelect.innerHTML = '<option value="" disabled selected>Error al cargar servicios</option>';
-            if (servicesGridContainer) servicesGridContainer.innerHTML = '<p class="placeholder">Error al cargar servicios.</p>';
-            if (dayOptionsContainer) dayOptionsContainer.innerHTML = '<p class="placeholder">Error al cargar disponibilidad.</p>';
-            return; // Stop further initialization if Firebase is not available
+        if (!window.firebaseServices || !database || !fbPush || !fbServerTimestamp) { 
+            console.error("Firebase services (database, push, serverTimestamp) not fully loaded/available. Booking functionality will be disabled.");
+            const criticalErrorMsg = "Error de conexión crítico. La agenda no está disponible en este momento.";
+            displayMessage(criticalErrorMsg, "error");
+            if (serviceSelect) serviceSelect.innerHTML = `<option value="" disabled selected>${criticalErrorMsg}</option>`;
+            if (servicesGridContainer) servicesGridContainer.innerHTML = `<p class="placeholder error-message">${criticalErrorMsg}</p>`;
+            if (dayOptionsContainer) dayOptionsContainer.innerHTML = `<p class="placeholder error-message">${criticalErrorMsg}</p>`;
+            if (submitButton) submitButton.disabled = true;
+            if (bookingForm) Array.from(bookingForm.elements).forEach(el => { if(el.type !== 'button') el.disabled = true; });
+            return;
         }
 
+        const servicesLoadedSuccess = await loadBookingPageServices();
+        let daysLoadedSuccess = false;
+        if (servicesLoadedSuccess) {
+            daysLoadedSuccess = await generateDayOptions();
+        } else {
+            if (dayOptionsContainer) dayOptionsContainer.innerHTML = '<p class="placeholder">Error al cargar servicios, no se puede mostrar disponibilidad.</p>';
+            if (submitButton) submitButton.disabled = true; 
+        }
 
-        await loadBookingPageServices(); // Made async
+        if (!daysLoadedSuccess && servicesLoadedSuccess) { 
+             if (submitButton) submitButton.disabled = true; 
+        }
 
         if (bookingForm) {
-            await generateDayOptions(); // Made async
             setupDayNavigation();
             addRealtimeValidationListeners();
-            await handleFormSubmit(); // Made async
+            await handleFormSubmit(); 
 
-            serviceSelect?.addEventListener('change', async () => { // Made async
+            if (!servicesLoadedSuccess || !daysLoadedSuccess) {
+                displayMessage("Algunos datos no se cargaron correctamente. La funcionalidad de reserva puede estar limitada.", "error");
+            }
+
+            serviceSelect?.addEventListener('change', async () => {
                 const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
                 currentSelectedServiceDuration = selectedOption ? parseInt(selectedOption.dataset.duration, 10) : null;
                 updateSelectedServicePrice();
                 toggleOtherServiceDetails();
-                validateFormAndToggleButton();
+                validateFormAndToggleButton(); 
 
                 const selectedDate = hiddenDateInput.value;
-                if (selectedDate) {
-                    hiddenTimeInput.value = '';
-                    await displayTimeSlots(selectedDate); // Made async
+                if (selectedDate && servicesLoadedSuccess && daysLoadedSuccess) {
+                    hiddenTimeInput.value = ''; 
+                    const slotsDisplayedSuccess = await displayTimeSlots(selectedDate);
+                    if (!slotsDisplayedSuccess) {
+                        if (submitButton) submitButton.disabled = true; 
+                    }
                 } else {
                     if (timeSlotsContainer) timeSlotsContainer.style.display = 'none';
-                    if (timeOptionsContainer) timeOptionsContainer.innerHTML = '<span class="loading-placeholder">Selecciona un día para ver horarios.</span>';
-                    displayHint(timeHint, '', true);
+                    if (timeOptionsContainer) {
+                        let timePlaceholderMsg = 'Selecciona un día y servicio para ver horarios.';
+                        if (!servicesLoadedSuccess) timePlaceholderMsg = 'Error al cargar servicios, no se pueden mostrar horarios.';
+                        else if (!daysLoadedSuccess) timePlaceholderMsg = 'Error al cargar días, no se pueden mostrar horarios.';
+                        timeOptionsContainer.innerHTML = `<span class="loading-placeholder">${timePlaceholderMsg}</span>`;
+                    }
+                    displayHint(timeHint, '', true); 
+                    if (submitButton) submitButton.disabled = true;
                 }
             });
         }
 
-        let animationIntervalId = null;
         if (animationContainer) {
-            createFallingIcon();
-            animationIntervalId = setInterval(createFallingIcon, 1200);
-            document.addEventListener("visibilitychange", () => {
-                if (document.hidden) { if (animationIntervalId) { clearInterval(animationIntervalId); animationIntervalId = null; } }
-                else { if (!animationIntervalId) { createFallingIcon(); animationIntervalId = setInterval(createFallingIcon, 1200); } }
-            });
+            try {
+                createFallingIcon(); 
+                animationIntervalId = setInterval(createFallingIcon, 1200);
+                document.addEventListener("visibilitychange", () => {
+                    if (document.hidden) { if (animationIntervalId) { clearInterval(animationIntervalId); animationIntervalId = null; } }
+                    else { if (!animationIntervalId && animationContainer) { createFallingIcon(); animationIntervalId = setInterval(createFallingIcon, 1200); } }
+                });
+            } catch (e) {
+                console.error("Error setting up animation:", e);
+                if (animationContainer) animationContainer.innerHTML = ''; 
+                if (animationIntervalId) clearInterval(animationIntervalId);
+            }
         }
     }
 
-    // --- Go! ---
-    initializePage();
-
+    initializePage().catch(error => {
+        console.error("Error fatal durante la inicialización de la página:", error);
+        displayMessage("Ocurrió un error inesperado al cargar la página. Por favor, intente refrescar.", "error");
+         if (submitButton) submitButton.disabled = true;
+         if (bookingForm) Array.from(bookingForm.elements).forEach(el => { if(el.type !== 'button') el.disabled = true; });
+    });
 });
