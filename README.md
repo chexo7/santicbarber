@@ -9,7 +9,7 @@ Este proyecto es una aplicación web para la gestión de reservas en la barberí
    git clone <repo-url>
    cd santicbarber
    ```
-2. **Configurar Firebase**: reemplazar las credenciales en `index.html` y `admin.html` por las de tu propio proyecto de Firebase.
+2. **Configurar Firebase**: reemplazar las credenciales en `firebase-config.js` por las de tu propio proyecto de Firebase.
 3. **Hospedaje estático**: puedes servir los archivos con cualquier hosting de archivos estáticos (por ejemplo Vercel). El archivo `vercel.json` redirige la ruta `/admin` a `admin.html`.
 4. **Base de datos**: utiliza Firebase Realtime Database. Las reglas de seguridad se encuentran en `database.rules.json`.
 

@@ -216,41 +216,7 @@
         </div>
     </footer>
 
-    <script type="module">
-      // Import the functions you need from the SDKs you need
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-      import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
-      // Only import database for the public page, auth is not needed here
-      import { getDatabase, ref, set, get, child, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-
-      // Your web app's Firebase configuration
-      const firebaseConfig = {
-        apiKey: "AIzaSyBHaT9gQRq1e58VjX798LnkxqLtjF9W9DA", // KEEP YOUR KEY SECRET
-        authDomain: "santicbarber.firebaseapp.com",
-        databaseURL: "https://santicbarber-default-rtdb.firebaseio.com",
-        projectId: "santicbarber",
-        storageBucket: "santicbarber.firebasestorage.app",
-        messagingSenderId: "52314683922",
-        appId: "1:52314683922:web:b61e2332935a731ed6b6cb",
-        measurementId: "G-W9ZEM88PZ7"
-      };
-
-      // Initialize Firebase
-      const app = initializeApp(firebaseConfig);
-      const analytics = getAnalytics(app);
-      const database = getDatabase(app);
-
-      // Make Firebase services available globally for script.js
-      window.firebaseServices = {
-          database,
-          ref,
-          set, // For saving appointments
-          get,
-        child,
-        push, // For generating unique keys for new data like appointments
-        serverTimestamp // For server-side timestamps (optional, but good to have)
-      };
-    </script>
+    <script type="module" src="firebase-config.js"></script>
 
     <script src="script.js"></script>
 </body>
