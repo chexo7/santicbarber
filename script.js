@@ -169,11 +169,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 activeServices.forEach(service => {
                     const serviceItem = document.createElement('div');
                     serviceItem.classList.add('service-item');
-                    serviceItem.innerHTML = `
-                        <span class="service-icon">${service.icon || '✂️'}</span>
-                        <h3>${service.name}</h3>
-                        <p>${getServiceDescription(service.id, allServices)}</p>
-                        <p class="service-price" data-service-id="${service.id}">${formatPrice(service.price)}</p>`;
+
+                    const iconSpan = document.createElement('span');
+                    iconSpan.classList.add('service-icon');
+                    iconSpan.textContent = service.icon || '✂️';
+
+                    const title = document.createElement('h3');
+                    title.textContent = service.name;
+
+                    const desc = document.createElement('p');
+                    desc.textContent = getServiceDescription(service.id, allServices);
+
+                    const priceP = document.createElement('p');
+                    priceP.classList.add('service-price');
+                    priceP.dataset.serviceId = service.id;
+                    priceP.textContent = formatPrice(service.price);
+
+                    serviceItem.appendChild(iconSpan);
+                    serviceItem.appendChild(title);
+                    serviceItem.appendChild(desc);
+                    serviceItem.appendChild(priceP);
+
                     servicesGridContainer.appendChild(serviceItem);
                 });
             }
